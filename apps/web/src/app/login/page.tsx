@@ -3,6 +3,10 @@ import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Sign in" };
 
+// ALLOW_SIGNUP is read per request. Without this the page is prerendered at build time, before
+// the deployment's runtime variables exist, and the sign-up form can never appear.
+export const dynamic = "force-dynamic";
+
 export default function LoginPage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-16">
