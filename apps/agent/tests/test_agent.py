@@ -142,7 +142,7 @@ async def test_tools_record_calls_and_goal(cfg):
     recorder = CallRecorder()
     tools, _ = build_tools(cfg, compiled, recorder)
     by_name = {t.info.name: t for t in tools}
-    assert set(by_name) == {t.name for t in cfg.tools} | {"transfer_to_human"}
+    assert set(by_name) == {t.name for t in cfg.tools} | {"transfer_to_human", "take_message"}
 
     out = await by_name["check_service_area"](raw_arguments={"zip_code": "78704"}, context=None)
     assert json.loads(out)["found"] is True
@@ -221,3 +221,22 @@ def test_bad_timezone_rejected(cfg):
     raw["persona"]["timezone"] = "Mars/Olympus"
     with pytest.raises(ValidationError, match="unknown timezone"):
         AgentConfig.model_validate(raw)
+
+
+async def test_take_message_is_recorded_on_the_call_and_drops_empty_fields(cfg):
+    recorder = CallRecorder()
+    tools, _ = build_tools(cfg, compile_agent(cfg), recorder)
+    message = next(t for t in tools if t.info.name == "take_message")
+    out = await message(
+        raw_arguments={
+            "name": " Sam Lee ",
+            "phone": "5125550100",
+            "reason": "Leaking faucet",
+            "best_time": " ",
+        },
+        context=None,
+    )
+    assert json.loads(out)["status"] == "recorded"
+    (call,) = recorder.calls
+    assert (call.tool, call.ok, call.goal) == ("take_message", True, False)
+    assert call.args == {"name": "Sam Lee", "phone": "5125550100", "reason": "Leaking faucet"}

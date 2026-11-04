@@ -133,6 +133,45 @@ def _transfer_tool(cfg: AgentConfig, recorder: CallRecorder) -> RawFunctionTool:
     )
 
 
+def _message_tool(recorder: CallRecorder) -> RawFunctionTool:
+    """Built in: take a message for the team. Recorded on the call, so it is never lost."""
+
+    async def handler(raw_arguments: dict[str, object], context: RunContext) -> str:
+        args = {k: str(v).strip() for k, v in raw_arguments.items() if str(v).strip()}
+        recorder.calls.append(
+            ToolCallRecord("take_message", args, True, {"status": "recorded"}, 0, False)
+        )
+        return json.dumps({"status": "recorded", "say": "I have that and will pass it on."})
+
+    return function_tool(
+        handler,
+        raw_schema={
+            "name": "take_message",
+            "description": (
+                "Record a message for the team when you cannot do something yourself. Read the "
+                "phone number back to the caller before you call this."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Caller's name."},
+                    "phone": {"type": "string", "description": "Callback number."},
+                    "reason": {
+                        "type": "string",
+                        "description": "What they need, in one or two sentences.",
+                    },
+                    "best_time": {
+                        "type": "string",
+                        "description": "When to call back, if they said.",
+                    },
+                },
+                "required": ["name", "phone", "reason"],
+                "additionalProperties": False,
+            },
+        },
+    )
+
+
 def build_tools(
     cfg: AgentConfig, compiled: CompiledAgent, recorder: CallRecorder
 ) -> tuple[list[Any], dict[str, Adapter]]:
@@ -147,4 +186,5 @@ def build_tools(
     }
     tools: list[Any] = [_make_tool(t, adapters[t.adapter], recorder) for t in compiled.tools]
     tools.append(_transfer_tool(cfg, recorder))
+    tools.append(_message_tool(recorder))
     return tools, adapters
