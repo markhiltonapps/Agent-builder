@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { signIn, signUp } from "../actions";
 
-export function LoginForm() {
+export function LoginForm({ allowSignup }: { allowSignup: boolean }) {
   const [mode, setMode] = useState<"in" | "up">("in");
   const [state, action, pending] = useActionState(mode === "in" ? signIn : signUp, undefined);
 
@@ -31,13 +31,17 @@ export function LoginForm() {
       <button className="btn btn-primary w-full" disabled={pending}>
         {pending ? "One moment…" : mode === "in" ? "Sign in" : "Create account"}
       </button>
-      <button
-        type="button"
-        className="btn btn-quiet w-full"
-        onClick={() => setMode(mode === "in" ? "up" : "in")}
-      >
-        {mode === "in" ? "New here? Create an account" : "Already have an account? Sign in"}
-      </button>
+      {allowSignup ? (
+        <button
+          type="button"
+          className="btn btn-quiet w-full"
+          onClick={() => setMode(mode === "in" ? "up" : "in")}
+        >
+          {mode === "in" ? "New here? Create an account" : "Already have an account? Sign in"}
+        </button>
+      ) : (
+        <p className="text-center text-xs text-faint">Accounts are by invitation.</p>
+      )}
     </form>
   );
 }

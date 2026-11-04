@@ -1,0 +1,13 @@
+**/node_modules
+**/.venv
+**/.next
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/.env
+**/.env.*
+!**/.env.example
+.git
+apps/agent/call_logs
+apps/agent/conversations
+apps/web/src/lib/templates

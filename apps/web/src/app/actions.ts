@@ -24,6 +24,11 @@ export async function signIn(_: FormState, form: FormData): Promise<FormState> {
 }
 
 export async function signUp(_: FormState, form: FormData): Promise<FormState> {
+  // Sign-up is closed unless ALLOW_SIGNUP=true. The database also restricts who can create a
+  // workspace (signup_allowlist), so this is a convenience layer, not the only lock.
+  if (process.env.ALLOW_SIGNUP !== "true") {
+    return { error: "Sign-up is by invitation. Ask Neato for an account." };
+  }
   const password = String(form.get("password") ?? "");
   if (password.length < 8) {
     return { error: "Use at least 8 characters for the password.", email: text(form, "email") };
