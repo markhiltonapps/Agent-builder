@@ -36,6 +36,7 @@
 html {
   background: var(--bg);
   scroll-padding-top: 4rem; /* keep focused fields clear of the sticky header */
+  scroll-padding-bottom: 6rem; /* ...and of the fixed Save bar on phones */
 }
 
 body {
@@ -252,5 +253,6 @@ body {
 @media (min-width: 1024px) {
   html {
     scroll-padding-top: 12rem; /* the editor header is sticky on wide screens */
+    scroll-padding-bottom: 0;
   }
 }

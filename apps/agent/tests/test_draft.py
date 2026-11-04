@@ -130,7 +130,7 @@ async def test_provider_errors_become_plain_messages(openai, status, message):
 
 async def test_no_key_is_a_clear_error(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    with pytest.raises(DraftError, match="not set up"):
+    with pytest.raises(DraftError, match="set up"):
         await draft("x")
 
 
@@ -179,7 +179,7 @@ async def test_revise_endpoint_rejects_an_invalid_current_config(client):
 async def test_draft_errors_are_502_with_a_message(client, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     r = await client.post("/v1/draft", json={"description": "x"}, headers=AUTH)
-    assert r.status == 502 and "not set up" in (await r.json())["error"]
+    assert r.status == 502 and "set up" in (await r.json())["error"]
 
 
 def test_default_model_is_overridable_by_env(monkeypatch):

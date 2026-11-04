@@ -193,7 +193,8 @@ export function Editor({ agent, initial, latest, published, notice }: Props) {
             )}
           </div>
           {/* On a phone this is a bar fixed to the bottom, so Save stays in reach however far you scroll. */}
-          <div className="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-line bg-[#0e0f16]/95 p-3 lg:static lg:z-auto lg:border-0 lg:bg-transparent lg:p-0">
+          <div className="fixed inset-x-0 bottom-0 z-20 flex flex-wrap gap-2 border-t border-line bg-[#0e0f16]/95 p-3 lg:static lg:z-auto lg:border-0 lg:bg-transparent lg:p-0">
+            <p className="order-first basis-full text-xs text-muted empty:hidden lg:hidden">{saveReason || publishReason}</p>
             <button className={`btn flex-1 lg:flex-none ${dirty ? "btn-primary" : ""}`} onClick={save} disabled={!dirty || busy || issues.length > 0}>
               {pending === "save" ? "Saving…" : "Save changes"}
             </button>
@@ -204,9 +205,12 @@ export function Editor({ agent, initial, latest, published, notice }: Props) {
         </div>
         <p className="text-xs text-faint">
           Saving keeps a draft. Callers reach your agent only after you publish.
-          {(saveReason || publishReason) && <span className="ml-1 text-muted">{saveReason || publishReason}</span>}
+          {(saveReason || publishReason) && <span className="ml-1 hidden text-muted lg:inline">{saveReason || publishReason}</span>}
         </p>
-        <p role="status" aria-live="polite" className={`text-sm empty:sr-only ${message?.kind === "error" ? "text-danger" : "text-ok"}`}>
+        <p
+          role="status" aria-live="polite"
+          className={`fixed inset-x-3 bottom-28 z-20 rounded-lg border border-line bg-[#0e0f16] p-3 text-sm shadow-lg empty:sr-only lg:static lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none ${message?.kind === "error" ? "text-danger" : "text-ok"}`}
+        >
           {message?.text ?? ""}
         </p>
       </div>

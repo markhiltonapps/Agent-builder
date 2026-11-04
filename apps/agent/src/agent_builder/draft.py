@@ -141,7 +141,7 @@ async def draft(
     """Draft a new agent from ``request``, or revise ``existing`` as ``request`` says."""
     key = key or os.getenv("OPENAI_API_KEY", "")
     if not key:
-        raise DraftError("AI help is not set up on this server yet.")
+        raise DraftError("AI help isn't set up on this server yet. Contact Neato.")
     model = model or os.getenv("DRAFT_MODEL") or DEFAULT_MODEL
     base = (base_url or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
 
