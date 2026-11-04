@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LocalTime } from "@/components/local-time";
 import { supabaseServer } from "@/lib/supabase/server";
 import { TEMPLATES } from "@/lib/templates";
 import { CreateAccountForm, CreateAgentForm } from "./forms";
@@ -30,12 +31,10 @@ export default async function AgentsPage() {
 
   const account = accounts[0];
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <section aria-labelledby="agents-h">
-        <div className="mb-4 flex items-baseline justify-between">
-          <h1 id="agents-h" className="text-2xl font-semibold tracking-tight">Agents</h1>
-          <span className="text-sm text-faint">{account.name}</span>
-        </div>
+        <h1 id="agents-h" className="text-2xl font-semibold tracking-tight">Agents</h1>
+        <p className="mb-4 mt-1 text-sm text-muted">{account.name}</p>
         {agents?.length ? (
           <ul className="grid gap-3 sm:grid-cols-2">
             {agents.map((a) => {
@@ -49,25 +48,25 @@ export default async function AgentsPage() {
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <h2 className="truncate font-medium">{a.name}</h2>
                       {published ? (
-                        <span className="chip chip-live">Live · v{published}</span>
+                        <span className="chip chip-live whitespace-nowrap">Live: version {published}</span>
                       ) : (
-                        <span className="chip">Not published</span>
+                        <span className="chip whitespace-nowrap">Not live yet</span>
                       )}
                     </div>
-                    <p className="text-xs text-faint">
-                      Edited {new Date(a.updated_at).toLocaleDateString()}
-                    </p>
+                    <p className="text-xs text-faint">Edited <LocalTime iso={a.updated_at} /></p>
                   </Link>
                 </li>
               );
             })}
           </ul>
         ) : (
-          <p className="glass p-6 text-muted">No agents yet. Start one from a template.</p>
+          <p className="glass p-6 text-muted">
+            No agents yet. Choose how to start in the form, name your agent, and you&apos;ll have a working agent to edit and test.
+          </p>
         )}
       </section>
 
-      <aside className="glass h-fit p-5" aria-labelledby="new-h">
+      <aside className="glass h-fit p-5 lg:sticky lg:top-20" aria-labelledby="new-h">
         <h2 id="new-h" className="mb-4 font-medium">New agent</h2>
         <CreateAgentForm accountId={account.id} templates={TEMPLATES.map(({ key, label, blurb }) => ({ key, label, blurb }))} />
       </aside>

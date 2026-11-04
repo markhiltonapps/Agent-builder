@@ -38,7 +38,7 @@ export default async function VersionsPage({ params }: PageProps<"/agents/[id]/v
         <Link href={`/agents/${id}`} className="link text-sm">← Back to editor</Link>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">{agent.name}: version history</h1>
         <p className="mt-1 text-sm text-muted">
-          Versions never change once saved. Rolling back goes live with an older version; nothing is deleted.
+          Every save is kept as its own version. Rolling back makes an older version live again; nothing is deleted.
         </p>
       </div>
       <VersionHistory

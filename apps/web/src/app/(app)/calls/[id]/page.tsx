@@ -33,11 +33,11 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
           <LocalTime iso={call.started_at} />
           <span className="chip">{duration(Number(call.duration_s))}</span>
-          <span className="chip">v{call.agent_version ?? "?"}</span>
-          <span className="chip">{call.source === "phone" ? "Phone" : "Browser"}</span>
-          {call.goal_reached && <span className="chip chip-live">Goal reached</span>}
+          <span className="chip">Version {call.agent_version ?? "?"}</span>
+          <span className="chip">{call.source === "phone" ? "Phone" : "Test call"}</span>
+          {call.goal_reached && <span className="chip chip-live">Successful</span>}
           {call.transferred && <span className="chip">Transferred{call.transfer_reason ? `: ${call.transfer_reason}` : ""}</span>}
-          {call.recoveries > 0 && <span className="chip" title="The voice model dropped and the call was resumed">Resumed ×{call.recoveries}</span>}
+          {call.recoveries > 0 && <span className="chip" title="The connection dropped briefly and the call continued.">Reconnected ×{call.recoveries}</span>}
         </p>
       </div>
 
@@ -68,8 +68,7 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
                 <div className="flex flex-wrap items-center gap-2">
                   <code className="font-mono">{t.tool}</code>
                   <span className={`chip ${t.ok ? "chip-live" : ""}`}>{t.ok ? "Worked" : "Failed"}</span>
-                  {t.goal && t.ok && <span className="chip">Goal</span>}
-                  <span className="text-xs text-faint">{t.latency_ms} ms</span>
+                                    <span className="text-xs text-faint">{t.latency_ms} ms</span>
                 </div>
                 <p className="mt-2 break-words font-mono text-xs text-muted">
                   {Object.entries(t.args).map(([k, v]) => `${k}=${String(v)}`).join("  ") || "no inputs"}

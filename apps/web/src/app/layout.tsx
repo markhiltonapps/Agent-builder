@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: { default: "Neato Agent Builder", template: "%s · Neato Agent Builder" },
-  description: "Build, test and run voice agents.",
+  description: "Build, test and run AI phone agents.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

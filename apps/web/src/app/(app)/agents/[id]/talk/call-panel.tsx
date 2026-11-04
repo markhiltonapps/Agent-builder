@@ -10,9 +10,13 @@ interface Line { id: string; who: "you" | "agent"; text: string; final: boolean 
 
 const AGENT_WAIT_MS = 25_000;
 
+const STATE_LABEL: Record<string, string> = {
+  listening: "Listening", thinking: "Thinking", speaking: "Speaking", initializing: "Getting ready",
+};
+
 export function CallPanel({
-  agentId, agentName, liveVersion,
-}: { agentId: string; agentName: string; liveVersion: number | null }) {
+  agentId, agentName, liveVersion, savedVersion,
+}: { agentId: string; agentName: string; liveVersion: number | null; savedVersion: number | null }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
@@ -21,6 +25,7 @@ export function CallPanel({
   const room = useRef<Room | null>(null);
   const waitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioEls = useRef<HTMLMediaElement[]>([]);
+  const endRef = useRef<HTMLButtonElement>(null);
 
   const cleanup = useCallback(() => {
     if (waitTimer.current) clearTimeout(waitTimer.current);
@@ -87,8 +92,8 @@ export function CallPanel({
       const denied = e instanceof Error && /permission|denied|NotAllowed/i.test(e.message);
       setError(
         denied
-          ? "The browser blocked the microphone. Allow it for this site, then try again."
-          : "Could not connect the call. Please try again.",
+          ? "Your browser blocked the microphone. Allow it for this site in your browser settings, then try again."
+          : "We couldn't start the call. Please try again.",
       );
       setPhase("idle");
       return;
@@ -98,7 +103,7 @@ export function CallPanel({
     waitTimer.current = setTimeout(() => {
       if (![...(r.remoteParticipants?.values() ?? [])].some((p) => p.isAgent)) {
         cleanup();
-        setError("The voice agent did not answer. The voice worker may be offline.");
+        setError("Your agent didn't pick up. Try again in a minute. If it keeps happening, contact Neato.");
         setPhase("idle");
       }
     }, AGENT_WAIT_MS);
@@ -118,18 +123,26 @@ export function CallPanel({
   if (liveVersion === null) {
     return (
       <div className="glass p-6">
-        <p className="mb-3">Calls run the <strong>published</strong> version, and this agent has none yet.</p>
-        <Link href={`/agents/${agentId}`} className="btn btn-primary">Go publish it</Link>
+        <p className="mb-3">Test calls use the published version, and this agent isn&apos;t published yet.</p>
+        <Link href={`/agents/${agentId}`} className="btn btn-primary">Publish this agent</Link>
       </div>
     );
   }
 
   const inCall = phase === "connecting" || phase === "live";
+  const stale = savedVersion !== null && savedVersion > liveVersion;
+
   return (
     <div className="glass space-y-5 p-6">
+      {stale && (
+        <p className="rounded-lg border border-warn/40 bg-warn/10 p-3 text-sm" role="note">
+          Your latest changes (version {savedVersion}) are saved but not live. This call uses version {liveVersion}.{" "}
+          <Link href={`/agents/${agentId}`} className="link">Publish version {savedVersion}</Link> to test them.
+        </p>
+      )}
       <p className="text-sm text-muted">
-        You&apos;ll talk to <strong className="font-medium text-text">{agentName}</strong> as it is live now
-        (version {liveVersion}). Allow the microphone when your browser asks. Use headphones to avoid echo.
+        You&apos;ll talk to <strong className="font-medium text-text">{agentName}</strong> as it is live now (version {liveVersion}).
+        Try pretending to be a customer: ask for a quote, or describe a problem. Headphones help avoid echo.
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -139,20 +152,27 @@ export function CallPanel({
           </button>
         ) : (
           <>
-            <button className="btn btn-danger" onClick={hangUp}>End call</button>
+            <button ref={endRef} className="btn btn-danger" onClick={hangUp} autoFocus>End call</button>
             <button className="btn" onClick={toggleMute} disabled={phase !== "live"} aria-pressed={muted}>
-              {muted ? "Unmute" : "Mute"}
+              Mute microphone
             </button>
           </>
         )}
         <span role="status" aria-live="polite" className="text-sm text-muted">
-          {phase === "connecting" && "Connecting…"}
-          {phase === "live" && (agentState ? `Agent: ${agentState}` : "Connected. Waiting for the agent…")}
+          {phase === "connecting" && "Connecting. Your browser may ask to use the microphone: choose Allow."}
+          {phase === "live" && (agentState ? (STATE_LABEL[agentState] ?? "") : "Connected. Waiting for the agent…")}
           {phase === "ended" && "Call ended."}
         </span>
       </div>
 
-      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      {phase === "ended" && (
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/calls?agent=${agentId}`} className="btn btn-primary">See this call</Link>
+          <Link href={`/agents/${agentId}`} className="btn">Back to editor</Link>
+        </div>
+      )}
+
+      <p role="alert" className="text-sm text-danger empty:hidden">{error ?? ""}</p>
 
       {lines.length > 0 && (
         <ul className="max-h-96 space-y-2 overflow-y-auto rounded-lg border border-line p-4" aria-label="Transcript">

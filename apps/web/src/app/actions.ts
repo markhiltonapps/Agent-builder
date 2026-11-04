@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { compileConfig } from "@/lib/builder-api";
+import { compileConfig, draftConfig, reviseConfig } from "@/lib/builder-api";
 import { callToken } from "@/lib/livekit";
 import type { Compiled, ValidationIssue } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -36,7 +36,15 @@ export async function signUp(_: FormState, form: FormData): Promise<FormState> {
   }
   const supabase = await supabaseServer();
   const { data, error } = await supabase.auth.signUp({ email: text(form, "email"), password });
-  if (error) return { error: error.message, email: text(form, "email") };
+  if (error) {
+    const limited = error.status === 429 || /rate limit/i.test(error.message);
+    return {
+      error: limited
+        ? "Too many sign-up emails were sent. Wait about an hour and try again, or sign in if you already have an account."
+        : "We couldn't create your account. Check the email address and try again.",
+      email: text(form, "email"),
+    };
+  }
   // Supabase hides whether an email is registered: for an existing account it returns a
   // user with no identities, no session, and sends no new confirmation.
   if (data.user && data.user.identities?.length === 0) {
@@ -47,7 +55,7 @@ export async function signUp(_: FormState, form: FormData): Promise<FormState> {
   }
   if (!data.session) {
     return {
-      notice: "Account created. Open the confirmation email, then come back here and use Sign in.",
+      notice: "Account created. Open the confirmation email, then come back here and sign in.",
       email: text(form, "email"),
     };
   }
@@ -64,18 +72,36 @@ export async function signOut() {
 
 export async function createAccount(_: FormState, form: FormData): Promise<FormState> {
   const name = text(form, "name");
-  if (!name) return { error: "Give the workspace a name." };
+  if (!name) return { error: "Enter a name for your workspace." };
   const supabase = await supabaseServer();
   const { error } = await supabase.rpc("create_account", { p_name: name });
-  if (error) return { error: "Could not create the workspace." };
+  if (error) return { error: "We couldn't create the workspace. Try again." };
   redirect("/agents");
 }
 
 export async function createAgent(_: FormState, form: FormData): Promise<FormState> {
   const name = text(form, "name");
   const accountId = text(form, "account_id");
-  const template = TEMPLATES.find((t) => t.key === text(form, "template"));
-  if (!name || !template) return { error: "Name the agent and pick a template." };
+  if (!name) return { error: "Give the agent a name and choose how to start." };
+
+  // Start from a template, or let AI draft the agent from a plain description.
+  let config: unknown;
+  let note: string;
+  if (text(form, "mode") === "ai") {
+    const description = text(form, "description");
+    if (description.length < 30) {
+      return { error: "Tell us a little more about the business: what it does, when it is open, and why people call." };
+    }
+    const drafted = await draftConfig(description);
+    if (!drafted.ok) return { error: drafted.error };
+    config = drafted.config;
+    note = "Drafted by AI from your description";
+  } else {
+    const template = TEMPLATES.find((t) => t.key === text(form, "template"));
+    if (!template) return { error: "Give the agent a name and choose how to start." };
+    config = template.config;
+    note = `Started from the ${template.label} template`;
+  }
 
   const supabase = await supabaseServer();
   const { data: agent, error } = await supabase
@@ -83,15 +109,57 @@ export async function createAgent(_: FormState, form: FormData): Promise<FormSta
     .insert({ account_id: accountId, name })
     .select("id")
     .single();
-  if (error || !agent) return { error: "Could not create the agent." };
+  if (error || !agent) return { error: "We couldn't create the agent. Try again." };
 
   const { error: vErr } = await supabase.rpc("save_agent_version", {
     p_agent: agent.id,
-    p_config: template.config,
-    p_note: `Started from the ${template.label} template`,
+    p_config: config,
+    p_note: note,
   });
-  if (vErr) return { error: "The agent was created but its first version failed to save." };
+  if (vErr) return { error: "The agent was created but its first version didn't save. Open it from the Agents page and save again." };
   redirect(`/agents/${agent.id}`);
+}
+
+/** Copy an agent's latest version into a new agent in the same workspace. */
+export async function duplicateAgent(form: FormData): Promise<void> {
+  const agentId = text(form, "agent_id");
+  const supabase = await supabaseServer();
+  const { data: source } = await supabase.from("agents").select("id, name, account_id").eq("id", agentId).maybeSingle();
+  if (!source) redirect("/agents");
+  const { data: latest } = await supabase
+    .from("agent_versions")
+    .select("version, config")
+    .eq("agent_id", agentId)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!latest) redirect("/agents");
+
+  const { data: copy } = await supabase
+    .from("agents")
+    .insert({ account_id: source.account_id, name: `${source.name} copy`.slice(0, 200) })
+    .select("id")
+    .single();
+  if (!copy) redirect(`/agents/${agentId}`);
+  await supabase.rpc("save_agent_version", {
+    p_agent: copy.id,
+    p_config: latest.config,
+    p_note: `Copied from ${source.name}, version ${latest.version}`,
+  });
+  redirect(`/agents/${copy.id}`);
+}
+
+export type AiResult =
+  | { ok: true; config: unknown; summary: string }
+  | { ok: false; error: string };
+
+/** Ask AI to change an agent. Nothing is saved: the person reviews the changes first. */
+export async function askAiToChange(config: unknown, instruction: string): Promise<AiResult> {
+  const supabase = await supabaseServer();
+  const { data } = await supabase.auth.getClaims();
+  if (!data?.claims) return { ok: false, error: "Your session ended. Sign in again to continue." };
+  if (instruction.trim().length < 5) return { ok: false, error: "Describe what should change." };
+  return reviseConfig(config, instruction.trim());
 }
 
 // --- editing --------------------------------------------------------------------------
@@ -105,7 +173,7 @@ export type PreviewResult =
 export async function previewConfig(config: unknown): Promise<PreviewResult> {
   const supabase = await supabaseServer();
   const { data } = await supabase.auth.getClaims();
-  if (!data?.claims) return { ok: false, errors: [{ path: "", message: "Sign in again." }] };
+  if (!data?.claims) return { ok: false, errors: [{ path: "", message: "Your session ended. Sign in again to continue." }] };
   return compileConfig(config);
 }
 
@@ -117,9 +185,9 @@ export async function saveVersion(agentId: string, config: unknown, note: string
   const checked = await compileConfig(config);
   if (!checked.ok) {
     if ("errors" in checked) {
-      return { ok: false, error: "Fix the highlighted problems first.", issues: checked.errors };
+      return { ok: false, error: "Fix the problems listed in the preview, then save.", issues: checked.errors };
     }
-    return { ok: false, error: "The validation service is unreachable, so nothing was saved." };
+    return { ok: false, error: "We couldn't check your changes, so nothing was saved. Try again in a minute." };
   }
   const supabase = await supabaseServer();
   const { data, error } = await supabase.rpc("save_agent_version", {
@@ -128,7 +196,7 @@ export async function saveVersion(agentId: string, config: unknown, note: string
     p_note: note.trim().slice(0, 500),
   });
   if (error || !data) {
-    return { ok: false, error: "You don't have permission to save changes to this agent." };
+    return { ok: false, error: "We couldn't save your changes. Try again in a moment. If it keeps happening, you may not have edit access." };
   }
   revalidatePath(`/agents/${agentId}`, "layout");
   const row = data as { version: number; id: string };
@@ -141,7 +209,7 @@ export async function publishVersion(agentId: string, versionId: string): Promis
     p_agent: agentId,
     p_version: versionId,
   });
-  if (error) return { error: "Could not publish. You may not have permission." };
+  if (error) return { error: "Couldn't publish. Try again, or ask the workspace owner." };
   revalidatePath(`/agents/${agentId}`, "layout");
   return {};
 }
@@ -157,7 +225,7 @@ export async function startCall(agentId: string): Promise<CallResult> {
   const supabase = await supabaseServer();
   const { data } = await supabase.auth.getClaims();
   const userId = data?.claims?.sub;
-  if (!userId) return { ok: false, error: "Sign in again to start a call." };
+  if (!userId) return { ok: false, error: "Your session ended. Sign in again to start a test call." };
 
   // Row-level security means this only finds agents in the person's own workspaces.
   const { data: agent } = await supabase
@@ -167,11 +235,11 @@ export async function startCall(agentId: string): Promise<CallResult> {
     .maybeSingle();
   if (!agent) return { ok: false, error: "That agent was not found." };
   if (!agent.published_version_id) {
-    return { ok: false, error: "Publish a version first. Calls run the published version." };
+    return { ok: false, error: "Publish this agent first. Test calls use the published version." };
   }
   try {
     return { ok: true, ...(await callToken({ agentId, userId })) };
   } catch {
-    return { ok: false, error: "Calling is not set up on this server yet." };
+    return { ok: false, error: "Test calls aren't available yet. Contact Neato." };
   }
 }

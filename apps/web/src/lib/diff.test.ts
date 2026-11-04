@@ -18,14 +18,24 @@ test("reports changed, added and removed leaves with dotted paths", () => {
   ]);
 });
 
-test("arrays compare by position and report appended or dropped items", () => {
-  const got = diffJson({ g: ["a", "b"] }, { g: ["a", "c", "d"] });
-  assert.deepEqual(got, [
-    { path: "g[1]", kind: "changed", before: "b", after: "c" },
-    { path: "g[2]", kind: "added", after: "d" },
+test("lists of text compare by content: an insert does not make later items look changed", () => {
+  assert.deepEqual(diffJson({ g: ["a", "b", "c"] }, { g: ["a", "x", "b", "c"] }), [
+    { path: "g[1]", kind: "added", after: "x" },
   ]);
   assert.deepEqual(diffJson({ g: ["a", "b"] }, { g: ["a"] }), [
     { path: "g[1]", kind: "removed", before: "b" },
+  ]);
+  assert.deepEqual(diffJson({ g: ["a", "b"] }, { g: ["a", "c"] }), [
+    { path: "g[1]", kind: "added", after: "c" },
+    { path: "g[1]", kind: "removed", before: "b" },
+  ]);
+  assert.deepEqual(diffJson({ g: [] }, { g: ["a"] }), [{ path: "g[0]", kind: "added", after: "a" }]);
+});
+
+test("lists of objects still compare by position", () => {
+  assert.deepEqual(diffJson({ e: [{ a: 1 }, { a: 2 }] }, { e: [{ a: 1 }, { a: 3 }, { a: 4 }] }), [
+    { path: "e[1].a", kind: "changed", before: 2, after: 3 },
+    { path: "e[2]", kind: "added", after: { a: 4 } },
   ]);
 });
 

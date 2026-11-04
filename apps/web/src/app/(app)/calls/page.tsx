@@ -26,18 +26,18 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
     : undefined;
 
   return (
-    <section aria-labelledby="calls-h" className="space-y-4">
+    <section aria-labelledby="calls-h" className="mx-auto max-w-4xl space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 id="calls-h" className="text-2xl font-semibold tracking-tight">
           Calls{filteredName ? `: ${filteredName}` : ""}
         </h1>
-        {agentId && <Link href="/calls" className="link text-sm">Show all agents</Link>}
+        {agentId && <Link href="/calls" className="link text-sm">Show calls for all agents</Link>}
       </div>
 
       {!calls?.length ? (
         <p className="glass p-6 text-muted">
-          No calls yet. Open an agent and use <strong className="font-medium text-text">Talk to it</strong>, and
-          every call will be saved here with its transcript.
+          No calls yet. Open an agent and choose <strong className="font-medium text-text">Test call</strong>. Every
+          call is saved here with its transcript.
         </p>
       ) : (
         <ul className="glass divide-y divide-line overflow-hidden">
@@ -54,10 +54,10 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
                     <LocalTime iso={c.started_at} className="text-xs text-faint" />
                   </span>
                   <span className="flex flex-wrap items-center gap-2 text-sm">
-                    {c.goal_reached && <span className="chip chip-live">Goal reached</span>}
+                    {c.goal_reached && <span className="chip chip-live">Successful</span>}
                     {c.transferred && <span className="chip">Transferred</span>}
-                    <span className="chip">{c.source === "phone" ? "Phone" : "Browser"}</span>
-                    <span className="chip" title="Agent version">v{c.agent_version ?? "?"}</span>
+                    <span className="chip">{c.source === "phone" ? "Phone" : "Test call"}</span>
+                    <span className="chip" title="Agent version">Version {c.agent_version ?? "?"}</span>
                     <span className="w-14 text-right tabular-nums text-muted">{duration(Number(c.duration_s))}</span>
                   </span>
                 </Link>

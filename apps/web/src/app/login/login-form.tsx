@@ -11,7 +11,7 @@ export function LoginForm({ allowSignup }: { allowSignup: boolean }) {
   return (
     <div className="glass p-6">
       {allowSignup && (
-        <div role="tablist" aria-label="Sign in or create an account" className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-black/25 p-1">
+        <div role="group" aria-label="Choose what to do" className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-black/25 p-1">
           {(
             [
               ["in", "Sign in"],
@@ -21,11 +21,10 @@ export function LoginForm({ allowSignup }: { allowSignup: boolean }) {
             <button
               key={m}
               type="button"
-              role="tab"
-              aria-selected={mode === m}
+              aria-pressed={mode === m}
               onClick={() => setMode(m)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
-                mode === m ? "bg-white/12 text-text" : "text-muted hover:text-text"
+              className={`min-h-11 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
+                mode === m ? "bg-white/15 text-text" : "text-muted hover:text-text"
               }`}
             >
               {label}
@@ -58,30 +57,30 @@ function CredentialsForm({
   onUseSignIn?: () => void;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
+  const failed = Boolean(state?.error);
   return (
-    <form action={formAction} className="space-y-4" aria-describedby="form-status">
+    <form action={formAction} className="space-y-4">
       <div>
         <label className="label" htmlFor="email">Email</label>
-        <input id="email" name="email" type="email" autoComplete="email" required className="field" defaultValue={state?.email} />
+        <input
+          id="email" name="email" type="email" autoComplete="email" required className="field"
+          defaultValue={state?.email} aria-invalid={failed || undefined} aria-describedby={failed ? "form-error" : undefined}
+        />
       </div>
       <div>
         <label className="label" htmlFor="password">Password</label>
         <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete={autoComplete}
-          minLength={signingUp ? 8 : undefined}
-          required
-          className="field"
+          id="password" name="password" type="password" autoComplete={autoComplete}
+          minLength={signingUp ? 8 : undefined} required className="field"
+          aria-invalid={failed || undefined} aria-describedby={failed ? "form-error" : signingUp ? "password-hint" : undefined}
         />
-        {signingUp && <p className="hint">At least 8 characters.</p>}
+        {signingUp && <p id="password-hint" className="hint">At least 8 characters.</p>}
       </div>
-      <p id="form-status" role="status" className={state?.error ? "text-sm text-danger" : "text-sm text-ok"}>
-        {state?.error ?? state?.notice}
-      </p>
+      {/* Both regions are always in the page, so screen readers announce changes reliably. */}
+      <p id="form-error" role="alert" className="text-sm text-danger empty:hidden">{state?.error}</p>
+      <p role="status" className="text-sm text-ok empty:hidden">{state?.notice}</p>
       {signingUp && (state?.notice || state?.error?.includes("already has an account")) && onUseSignIn && (
-        <button type="button" className="btn w-full" onClick={onUseSignIn}>Go to Sign in</button>
+        <button type="button" className="btn w-full" onClick={onUseSignIn}>Back to sign in</button>
       )}
       <button className="btn btn-primary w-full" disabled={pending}>
         {pending ? "One moment…" : submitLabel}

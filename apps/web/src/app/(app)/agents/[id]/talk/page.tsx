@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { CallPanel } from "./call-panel";
 
-export const metadata: Metadata = { title: "Talk to your agent" };
+export const metadata: Metadata = { title: "Test call" };
 
 export default async function TalkPage({ params }: PageProps<"/agents/[id]/talk">) {
   const { id } = await params;
@@ -15,6 +15,14 @@ export default async function TalkPage({ params }: PageProps<"/agents/[id]/talk"
     .eq("id", id)
     .maybeSingle();
   if (!agent) notFound();
+
+  const { data: head } = await supabase
+    .from("agent_versions")
+    .select("version")
+    .eq("agent_id", id)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   let version: number | null = null;
   if (agent.published_version_id) {
@@ -29,8 +37,8 @@ export default async function TalkPage({ params }: PageProps<"/agents/[id]/talk"
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <Link href={`/agents/${id}`} className="link text-sm">← Back to editor</Link>
-      <h1 className="text-2xl font-semibold tracking-tight">Talk to {agent.name}</h1>
-      <CallPanel agentId={agent.id} agentName={agent.name} liveVersion={version} />
+      <h1 className="text-2xl font-semibold tracking-tight">Test call with {agent.name}</h1>
+      <CallPanel agentId={agent.id} agentName={agent.name} liveVersion={version} savedVersion={head?.version ?? null} />
     </div>
   );
 }
