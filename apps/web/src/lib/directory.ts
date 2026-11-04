@@ -10,7 +10,7 @@ export async function pushCard(supabase: SupabaseClient, agentId: string): Promi
   try {
     const { data: agent } = await supabase
       .from("agents")
-      .select("id, name, account_id, published_version_id")
+      .select("id, name, account_id, published_version_id, votel_task_id")
       .eq("id", agentId)
       .maybeSingle();
     if (!agent) return { ok: false, error: "That agent was not found." };
@@ -41,12 +41,20 @@ export async function pushCard(supabase: SupabaseClient, agentId: string): Promi
         about: persona.business_description ?? "",
         live_version: live?.version ?? null,
         app_url: process.env.APP_URL ?? "",
+        task_id: agent.votel_task_id ?? undefined,
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(60_000),
     });
     const body = await res.json().catch(() => ({}));
-    return res.ok && body.ok ? { ok: true } : { ok: false, error: typeof body.error === "string" ? body.error : "Votel did not accept it." };
+    if (res.ok && body.ok) {
+      // Remember the card so the next sync updates it directly instead of searching for it.
+      if (typeof body.task_id === "string" && body.task_id !== agent.votel_task_id) {
+        await supabase.rpc("set_votel_task_id", { p_agent: agent.id, p_task: body.task_id });
+      }
+      return { ok: true };
+    }
+    return { ok: false, error: typeof body.error === "string" ? body.error : "Votel did not accept it." };
   } catch {
     return { ok: false, error: "Couldn't reach Votel." };
   }

@@ -71,7 +71,9 @@ def _build(f: FakeVotel) -> FastMCP:
     @mcp.tool()
     def list_tasks(project: str = "", search: str = "", limit: int = 25) -> str:
         f.calls.append(("list_tasks", {"project": project, "search": search}))
-        hits = [t for t in f.tasks if t["project"] == project and search in t["description"]]
+        hits = [
+            t for t in f.tasks if t["project"] == project and search.lower() in t["title"].lower()
+        ]
         if not hits:
             return "No tasks found."
         return f"Found {len(hits)} task(s):\n\n" + "\n".join(
@@ -98,9 +100,19 @@ def _build(f: FakeVotel) -> FastMCP:
         return f'Task "{title}" created!\n  ID: {t["id"]}'
 
     @mcp.tool()
+    def get_task(task_id: str) -> str:
+        f.calls.append(("get_task", {"task_id": task_id}))
+        t = next((t for t in f.tasks if t["id"] == task_id), None)
+        if not t:
+            raise ValueError("Task not found")
+        return f"Task: {t['title']}\n  Status: {t['status']}\n\n{t['description']}"
+
+    @mcp.tool()
     def update_task(task_id: str, title: str = "", status: str = "", description: str = "") -> str:
         f.calls.append(("update_task", {"task_id": task_id, "title": title, "status": status}))
-        t = next(t for t in f.tasks if t["id"] == task_id)
+        t = next((t for t in f.tasks if t["id"] == task_id), None)
+        if not t:
+            raise ValueError("Task not found")
         t.update(
             {
                 k: v
@@ -161,7 +173,8 @@ def test_the_card_text_links_back_and_carries_the_agent_id():
 
 
 async def test_the_first_sync_creates_the_board_its_statuses_and_the_card(votel):
-    assert await sync_agent(_cfg(votel), _card()) == "created"
+    synced = await sync_agent(_cfg(votel), _card())
+    assert synced.result == "created"
     names = [n for n, _ in votel.calls]
     assert (
         names.index("create_status_template")
@@ -176,20 +189,49 @@ async def test_the_first_sync_creates_the_board_its_statuses_and_the_card(votel)
     ]
     assert PROJECT in votel.projects
     (task,) = votel.tasks
+    assert synced.task_id == task["id"]
     assert (
         task["project"] == PROJECT and task["status"] == NOT_LIVE and AGENT in task["description"]
     )
 
 
-async def test_syncing_again_updates_the_same_card_and_moves_it_to_live(votel):
-    await sync_agent(_cfg(votel), _card())
+async def test_syncing_again_with_the_remembered_id_updates_that_card(votel):
+    first = await sync_agent(_cfg(votel), _card())
     votel.calls.clear()
-    assert (
-        await sync_agent(_cfg(votel), _card(live_version=2, name="Front Desk (main)")) == "updated"
+    second = await sync_agent(
+        _cfg(votel), _card(live_version=2, name="Front Desk (main)"), first.task_id
     )
+    assert (second.result, second.task_id) == ("updated", first.task_id)
     assert len(votel.tasks) == 1
     assert votel.tasks[0]["status"] == LIVE and votel.tasks[0]["title"] == "Front Desk (main)"
-    assert "create_project" not in [n for n, _ in votel.calls]  # the board already exists
+    names = [n for n, _ in votel.calls]
+    assert "create_project" not in names and "list_tasks" not in names  # no searching needed
+
+
+async def test_a_lost_id_finds_the_card_by_name_and_agent_id_without_a_duplicate(votel):
+    first = await sync_agent(_cfg(votel), _card())
+    again = await sync_agent(_cfg(votel), _card(live_version=1))
+    assert (again.result, again.task_id) == ("updated", first.task_id)
+    assert len(votel.tasks) == 1 and votel.tasks[0]["status"] == LIVE
+
+
+async def test_a_deleted_card_is_made_again(votel):
+    first = await sync_agent(_cfg(votel), _card())
+    votel.tasks.clear()
+    again = await sync_agent(_cfg(votel), _card(), first.task_id)
+    assert again.result == "created" and again.task_id != first.task_id
+    assert len(votel.tasks) == 1
+
+
+async def test_agents_with_the_same_name_keep_separate_cards(votel):
+    other = "aaaaaaaa-0000-4000-8000-000000000001"
+    a = await sync_agent(_cfg(votel), _card())
+    b = await sync_agent(_cfg(votel), _card(agent_id=other))
+    assert a.task_id != b.task_id and len(votel.tasks) == 2
+    # With no remembered ids each one still finds its own card.
+    a2 = await sync_agent(_cfg(votel), _card())
+    b2 = await sync_agent(_cfg(votel), _card(agent_id=other))
+    assert (a2.task_id, b2.task_id) == (a.task_id, b.task_id) and len(votel.tasks) == 2
 
 
 async def test_two_agents_get_two_cards(votel):

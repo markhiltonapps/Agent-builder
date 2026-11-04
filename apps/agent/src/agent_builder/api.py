@@ -157,10 +157,10 @@ async def directory_sync(request: web.Request) -> web.Response:
             content_type="application/json",
         ) from None
     try:
-        result = await sync_agent(cfg, card)
+        synced = await sync_agent(cfg, card, str(body["task_id"]) if body.get("task_id") else None)
     except VotelError as e:
         return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
-    return web.json_response({"ok": True, "result": result})
+    return web.json_response({"ok": True, "result": synced.result, "task_id": synced.task_id})
 
 
 async def schema(_request: web.Request) -> web.Response:

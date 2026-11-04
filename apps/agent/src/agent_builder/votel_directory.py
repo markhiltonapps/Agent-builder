@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from .votel import UUID, VotelConfig, call_tool, first_id
+from .votel import UUID, VotelConfig, VotelError, call_tool, first_id
 
 PROJECT = "Voice Agents"
 TEMPLATE = "Voice agent status"
@@ -90,27 +90,55 @@ async def ensure_board(cfg: VotelConfig) -> None:
 
 
 def raise_missing(what: str) -> None:
-    from .votel import VotelError
-
     raise VotelError(f"Votel did not return an id for {what}")
 
 
-async def sync_agent(cfg: VotelConfig, card: AgentCard) -> str:
-    """Create or update this agent's card. Returns "created" or "updated"."""
-    await ensure_board(cfg)
-    # Votel does the search (the agent's id is in the card text), so any row it returns is this
-    # agent's card. Only list rows count: a heading must never be mistaken for a task.
+@dataclass(frozen=True)
+class Synced:
+    result: str  # "created" or "updated"
+    task_id: str
+
+
+async def _find_card(cfg: VotelConfig, card: AgentCard) -> str | None:
+    """Find an existing card without a remembered id. Votel's search only reads titles, so
+    search by the agent's name and confirm each hit by the agent id written in its text."""
     found = await call_tool(
-        cfg, "list_tasks", {"project": PROJECT, "search": card.agent_id, "limit": 5}
+        cfg, "list_tasks", {"project": PROJECT, "search": card.name, "limit": 25}
     )
-    rows = [ln for ln in found.splitlines() if ln.lstrip().startswith("-") and UUID.search(ln)]
-    existing = first_id(rows[0]) if rows else None
+    for line in found.splitlines():
+        if line.lstrip().startswith("-") and UUID.search(line):
+            candidate = first_id(line)
+            if candidate and card.agent_id in await call_tool(
+                cfg, "get_task", {"task_id": candidate}
+            ):
+                return candidate
+    return None
+
+
+async def sync_agent(cfg: VotelConfig, card: AgentCard, task_id: str | None = None) -> Synced:
+    """Create or update this agent's card. ``task_id`` is the card id remembered from last time.
+
+    A remembered id that no longer works (someone deleted the card) falls back to finding or
+    creating the card, so the directory heals itself.
+    """
+    await ensure_board(cfg)
     fields = {"title": card.name[:200], "description": card.description(), "status": card.status}
-    if existing:
-        await call_tool(cfg, "update_task", {"task_id": existing, **fields})
-        return "updated"
-    await call_tool(cfg, "create_task", {**fields, "project": PROJECT, "tags": ["voice-agent"]})
-    return "created"
+    if task_id:
+        try:
+            await call_tool(cfg, "update_task", {"task_id": task_id, **fields})
+            return Synced("updated", task_id)
+        except VotelError:
+            task_id = None
+    task_id = await _find_card(cfg, card)
+    if task_id:
+        await call_tool(cfg, "update_task", {"task_id": task_id, **fields})
+        return Synced("updated", task_id)
+    made = first_id(
+        await call_tool(cfg, "create_task", {**fields, "project": PROJECT, "tags": ["voice-agent"]})
+    )
+    if not made:
+        raise_missing("the new card")
+    return Synced("created", made)
 
 
 _SAFE = re.compile(r"\s+")
