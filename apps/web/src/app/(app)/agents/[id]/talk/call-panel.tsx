@@ -167,12 +167,12 @@ export function CallPanel({
 
       {phase === "ended" && (
         <div className="flex flex-wrap gap-2">
-          <Link href={`/calls?agent=${agentId}`} className="btn btn-primary">See this call</Link>
+          <Link href={`/calls?agent=${agentId}`} className="btn btn-primary">See calls for this agent</Link>
           <Link href={`/agents/${agentId}`} className="btn">Back to editor</Link>
         </div>
       )}
 
-      <p role="alert" className="text-sm text-danger empty:hidden">{error ?? ""}</p>
+      <p role="alert" className="text-sm text-danger empty:sr-only">{error ?? ""}</p>
 
       {lines.length > 0 && (
         <ul className="max-h-96 space-y-2 overflow-y-auto rounded-lg border border-line p-4" aria-label="Transcript">

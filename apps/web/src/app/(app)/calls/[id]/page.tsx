@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LocalTime } from "@/components/local-time";
 import { duration } from "@/lib/format";
+import { friendlyName } from "@/lib/labels";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Call" };
@@ -66,7 +67,7 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
             {tools.map((t, i) => (
               <li key={i} className="rounded-lg border border-line p-3 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
-                  <code className="font-mono">{t.tool}</code>
+                  <span className="font-medium">{friendlyName(t.tool)}</span>
                   <span className={`chip ${t.ok ? "chip-live" : ""}`}>{t.ok ? "Worked" : "Failed"}</span>
                                     <span className="text-xs text-faint">{t.latency_ms} ms</span>
                 </div>

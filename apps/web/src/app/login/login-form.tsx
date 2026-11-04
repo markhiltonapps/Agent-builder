@@ -77,8 +77,8 @@ function CredentialsForm({
         {signingUp && <p id="password-hint" className="hint">At least 8 characters.</p>}
       </div>
       {/* Both regions are always in the page, so screen readers announce changes reliably. */}
-      <p id="form-error" role="alert" className="text-sm text-danger empty:hidden">{state?.error}</p>
-      <p role="status" className="text-sm text-ok empty:hidden">{state?.notice}</p>
+      <p id="form-error" role="alert" className="text-sm text-danger empty:sr-only">{state?.error}</p>
+      <p role="status" className="text-sm text-ok empty:sr-only">{state?.notice}</p>
       {signingUp && (state?.notice || state?.error?.includes("already has an account")) && onUseSignIn && (
         <button type="button" className="btn w-full" onClick={onUseSignIn}>Back to sign in</button>
       )}

@@ -146,7 +146,7 @@ export async function duplicateAgent(form: FormData): Promise<void> {
     p_config: latest.config,
     p_note: `Copied from ${source.name}, version ${latest.version}`,
   });
-  redirect(`/agents/${copy.id}`);
+  redirect(`/agents/${copy.id}?copied=1`);
 }
 
 export type AiResult =

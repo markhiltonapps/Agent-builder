@@ -61,7 +61,7 @@ export default async function AgentsPage() {
           </ul>
         ) : (
           <p className="glass p-6 text-muted">
-            No agents yet. Choose how to start in the form, name your agent, and you&apos;ll have a working agent to edit and test.
+            No agents yet. Use New agent to choose how to start and name your agent, and you&apos;ll have a working agent to edit and test.
           </p>
         )}
       </section>

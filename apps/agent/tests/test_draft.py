@@ -120,7 +120,7 @@ async def test_a_revision_keeps_tools_adapters_and_runtime_exactly(openai):
 
 @pytest.mark.parametrize(
     ("status", "message"),
-    [(401, "rejected this server's key"), (429, "busy"), (500, "could not take the request")],
+    [(401, "set up correctly"), (429, "busy"), (500, "could not take the request")],
 )
 async def test_provider_errors_become_plain_messages(openai, status, message):
     fake = await openai([(status, None)])

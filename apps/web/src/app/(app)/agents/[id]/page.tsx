@@ -6,8 +6,9 @@ import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Edit agent" };
 
-export default async function AgentPage({ params }: PageProps<"/agents/[id]">) {
+export default async function AgentPage({ params, searchParams }: PageProps<"/agents/[id]">) {
   const { id } = await params;
+  const { copied } = await searchParams;
   const supabase = await supabaseServer();
 
   const { data: agent } = await supabase
@@ -38,6 +39,7 @@ export default async function AgentPage({ params }: PageProps<"/agents/[id]">) {
 
   return (
     <Editor
+      notice={copied ? "Copy created. You're editing it now." : undefined}
       agent={{ id: agent.id, name: agent.name }}
       initial={latest.config as AgentConfig}
       latest={{ id: latest.id, version: latest.version }}

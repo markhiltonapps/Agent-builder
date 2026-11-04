@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { confirmLeave } from "@/lib/unsaved";
 
 const LINKS = [
   { href: "/agents", label: "Agents" },
@@ -19,6 +20,7 @@ export function NavLinks() {
             key={l.href}
             href={l.href}
             aria-current={active ? "page" : undefined}
+            onClick={(e) => { if (!confirmLeave()) e.preventDefault(); }}
             className={`rounded-md px-3 py-2 transition-colors hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${
               active ? "bg-white/10 text-text" : "text-muted"
             }`}

@@ -96,7 +96,7 @@ export function VersionHistory({
             </button>
           )}
         </div>
-        <p role="status" aria-live="polite" className={`mb-3 text-sm empty:hidden ${message?.kind === "error" ? "text-danger" : "text-ok"}`}>
+        <p role="status" aria-live="polite" className={`mb-3 text-sm empty:sr-only ${message?.kind === "error" ? "text-danger" : "text-ok"}`}>
           {message?.text ?? ""}
         </p>
         {!previous && <p className="text-sm text-muted">This is where the agent started. Later versions show what changed from the one before.</p>}

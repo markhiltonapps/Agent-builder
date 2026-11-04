@@ -26,6 +26,8 @@ const LABELS: Record<string, string> = {
   "runtime.silence_timeout_seconds": "Quiet time before checking in",
 };
 
+const SINGULAR: Record<string, string> = { Rules: "Rule", Handoffs: "Handoff", Actions: "Action" };
+
 const SEGMENT: Record<string, string> = {
   condition: "when",
   action: "then",
@@ -43,10 +45,17 @@ export function labelFor(path: string): string {
       const rest = parts.slice(n);
       if (rest.length === 0) return hit;
       const [first, ...tail] = rest;
-      const idx = /^\d+$/.test(first) ? `${/^\d+$/.test(first) ? ` ${Number(first) + 1}` : ""}` : "";
-      const field = (/^\d+$/.test(first) ? tail : rest).map((s) => SEGMENT[s] ?? s.replace(/_/g, " ")).join(" ");
-      return `${hit}${idx ? `, item${idx}` : ""}${field ? `: ${field}` : ""}`;
+      const numbered = /^\d+$/.test(first);
+      const field = (numbered ? tail : rest).map((s) => SEGMENT[s] ?? s.replace(/_/g, " ")).join(" ");
+      const head = numbered ? `${SINGULAR[hit] ?? "Item"} ${Number(first) + 1}` : hit;
+      return `${head}${field ? `: ${field}` : ""}`;
     }
   }
   return parts.map((s) => s.replace(/_/g, " ")).join(" › ");
+}
+
+/** "check_service_area" -> "Check service area". */
+export function friendlyName(name: string): string {
+  const spaced = name.replace(/_/g, " ").trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }

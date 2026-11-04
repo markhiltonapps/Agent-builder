@@ -101,7 +101,7 @@ async def _ask(
             json={"model": model, "messages": messages, "response_format": {"type": "json_object"}},
         ) as r:
             if r.status in (401, 403):
-                raise DraftError("The AI service rejected this server's key. Check OPENAI_API_KEY.")
+                raise DraftError("AI help isn't set up correctly on this server. Contact Neato.")
             if r.status == 429:
                 raise DraftError("The AI service is busy right now. Try again in a minute.")
             if r.status >= 400:

@@ -8,8 +8,10 @@ import {
 } from "@/app/actions";
 import type { AgentConfig, ValidationIssue } from "@/lib/config";
 import { diffJson, type Json } from "@/lib/diff";
-import { labelFor } from "@/lib/labels";
+import { friendlyName, labelFor } from "@/lib/labels";
+import { setUnsaved } from "@/lib/unsaved";
 import { ChangeList } from "./change-list";
+import { DuplicateButton } from "./duplicate-button";
 import { AreaField, CsvField, NumberField, SelectField, StringList, TextField, Toggle } from "./fields";
 
 const SECTIONS = [
@@ -25,6 +27,7 @@ const SECTIONS = [
 type SectionKey = (typeof SECTIONS)[number][0];
 
 interface Props {
+  notice?: string;
   agent: { id: string; name: string };
   initial: AgentConfig;
   latest: { id: string; version: number };
@@ -45,8 +48,14 @@ const sectionOf = (path: string): SectionKey => {
 
 const friendly = (name: string) => name.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 const KIND_LABEL = { mock: "Sample data", http: "Real system", disabled: "Off" } as const;
+const adapterName = (n: string, kind: keyof typeof KIND_LABEL) =>
+  kind === "mock" && /demo|sample|mock/i.test(n) ? "Sample data" : friendly(n);
+const adapterLabel = (n: string, kind: keyof typeof KIND_LABEL) => {
+  const nice = adapterName(n, kind);
+  return nice === KIND_LABEL[kind] ? nice : `${nice} (${KIND_LABEL[kind]})`;
+};
 
-export function Editor({ agent, initial, latest, published }: Props) {
+export function Editor({ agent, initial, latest, published, notice }: Props) {
   const router = useRouter();
   const [config, setConfig] = useState<AgentConfig>(initial);
   const [saved, setSaved] = useState(JSON.stringify(initial));
@@ -55,7 +64,7 @@ export function Editor({ agent, initial, latest, published }: Props) {
   const [note, setNote] = useState("");
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(notice ? { kind: "ok", text: notice } : null);
   const [pending, setPending] = useState<"save" | "publish" | null>(null);
   const [, startTransition] = useTransition();
   const navRef = useRef<HTMLUListElement>(null);
@@ -76,6 +85,12 @@ export function Editor({ agent, initial, latest, published }: Props) {
     }, 350);
     return () => clearTimeout(t);
   }, [config]);
+
+  // The main navigation and Sign out live outside this component: tell them about unsaved work.
+  useEffect(() => {
+    setUnsaved(dirty);
+    return () => setUnsaved(false);
+  }, [dirty]);
 
   // Closing the tab or reloading with unsaved work asks first.
   useEffect(() => {
@@ -147,7 +162,7 @@ export function Editor({ agent, initial, latest, published }: Props) {
 
   return (
     <div className="w-full min-w-0 space-y-4">
-      <div className="glass sticky top-14 z-10 space-y-2 bg-[#0e0f16]/95 p-4">
+      <div className="glass space-y-2 bg-[#0e0f16]/95 p-4 lg:sticky lg:top-14 lg:z-10">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-xl font-semibold tracking-tight">{agent.name}</h1>
@@ -156,31 +171,33 @@ export function Editor({ agent, initial, latest, published }: Props) {
               {published ? <span className="chip chip-live">Live: version {published.version}</span> : <span className="chip">Not live yet</span>}
             </p>
             <div className="-ml-3 mt-1 flex flex-wrap items-center">
-              <Link href={`/agents/${agent.id}/versions`} onClick={leaveGuard} className="btn btn-quiet">Version history</Link>
-              <Link href={`/agents/${agent.id}/talk`} onClick={leaveGuard} className="btn btn-quiet">Test call</Link>
-              <Link href={`/calls?agent=${agent.id}`} onClick={leaveGuard} className="btn btn-quiet">Past calls</Link>
+              <Link href={`/agents/${agent.id}/versions`} onClick={leaveGuard} className="btn btn-quiet underline underline-offset-4">Version history</Link>
+              <Link href={`/agents/${agent.id}/talk`} onClick={leaveGuard} className="btn btn-quiet underline underline-offset-4">Test call</Link>
+              <Link href={`/calls?agent=${agent.id}`} onClick={leaveGuard} className="btn btn-quiet underline underline-offset-4">Past calls</Link>
               <form
+                className="ml-2"
                 action={duplicateAgent}
                 onSubmit={(e) => {
                   if (dirty && !window.confirm("Copy the last saved version? Your unsaved changes won't be included.")) e.preventDefault();
                 }}
               >
                 <input type="hidden" name="agent_id" value={agent.id} />
-                <button className="btn btn-quiet">Duplicate</button>
+                <DuplicateButton />
               </form>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
             {dirty && (
               <input
                 aria-label="What changed (optional)" placeholder="What changed? (optional)"
-                className="field w-56" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)}
+                className="field mt-2 w-full sm:w-80" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)}
               />
             )}
-            <button className={`btn ${dirty ? "btn-primary" : ""}`} onClick={save} disabled={!dirty || busy || issues.length > 0}>
+          </div>
+          {/* On a phone this is a bar fixed to the bottom, so Save stays in reach however far you scroll. */}
+          <div className="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-line bg-[#0e0f16]/95 p-3 lg:static lg:z-auto lg:border-0 lg:bg-transparent lg:p-0">
+            <button className={`btn flex-1 lg:flex-none ${dirty ? "btn-primary" : ""}`} onClick={save} disabled={!dirty || busy || issues.length > 0}>
               {pending === "save" ? "Saving…" : "Save changes"}
             </button>
-            <button className={`btn ${!dirty && !isLive ? "btn-primary" : ""}`} onClick={publish} disabled={dirty || busy || isLive}>
+            <button className={`btn flex-1 lg:flex-none ${!dirty && !isLive ? "btn-primary" : ""}`} onClick={publish} disabled={dirty || busy || isLive}>
               {pending === "publish" ? "Publishing…" : `Publish version ${head.version}`}
             </button>
           </div>
@@ -189,7 +206,7 @@ export function Editor({ agent, initial, latest, published }: Props) {
           Saving keeps a draft. Callers reach your agent only after you publish.
           {(saveReason || publishReason) && <span className="ml-1 text-muted">{saveReason || publishReason}</span>}
         </p>
-        <p role="status" aria-live="polite" className={`text-sm empty:hidden ${message?.kind === "error" ? "text-danger" : "text-ok"}`}>
+        <p role="status" aria-live="polite" className={`text-sm empty:sr-only ${message?.kind === "error" ? "text-danger" : "text-ok"}`}>
           {message?.text ?? ""}
         </p>
       </div>
@@ -198,7 +215,7 @@ export function Editor({ agent, initial, latest, published }: Props) {
         <aside className="glass p-4 text-sm" aria-label="Getting started">
           <p className="mb-2 font-medium">Getting started</p>
           <ol className="list-decimal space-y-1 pl-5 text-muted">
-            <li>Make it yours. Change anything on the left, and the preview shows what your agent will be told.</li>
+            <li>Make it yours. Change anything below. The preview shows what your agent will be told.</li>
             <li>Choose <strong className="font-medium text-text">Publish version 1</strong> to put it live.</li>
             <li>Choose <strong className="font-medium text-text">Test call</strong> and talk to it.</li>
           </ol>
@@ -358,7 +375,8 @@ function ActionsSection({ config, set, issues }: SectionProps) {
           return (
             <li key={t.name} className="space-y-3 rounded-xl border border-line bg-black/20 p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <code className="font-mono text-sm">{t.name}</code>
+                <span className="text-sm font-medium">{friendlyName(t.name)}</span>
+                <code className="font-mono text-xs text-faint">{t.name}</code>
                 {kind === "disabled" && <span className="chip">Off</span>}
                 {kind === "mock" && <span className="chip">Sample data</span>}
                 {t.goal && <span className="chip">Marks the call successful</span>}
@@ -367,7 +385,7 @@ function ActionsSection({ config, set, issues }: SectionProps) {
                 onChange={(v) => upTool(i, { description: v })} />
               <div className="grid gap-3 sm:grid-cols-2">
                 <SelectField label="Gets its answers from" value={t.adapter} onChange={(v) => upTool(i, { adapter: v })}
-                  options={adapterNames.map((n) => ({ value: n, label: `${friendly(n)} (${KIND_LABEL[config.adapters[n].kind]})` }))} />
+                  options={adapterNames.map((n) => ({ value: n, label: adapterLabel(n, config.adapters[n].kind) }))} />
                 <div className="self-end">
                   <Toggle label="Count the call as successful when this works (for example, a booking is made)" checked={t.goal} onChange={(v) => upTool(i, { goal: v })} />
                 </div>
@@ -385,7 +403,7 @@ function ActionsSection({ config, set, issues }: SectionProps) {
         <fieldset className="space-y-3">
           <legend className="label">Connections</legend>
           {adapterNames.map((n) => (
-            <SelectField key={n} label={friendly(n)} value={config.adapters[n].kind}
+            <SelectField key={n} label={adapterName(n, config.adapters[n].kind)} value={config.adapters[n].kind}
               onChange={(v) => set("adapters", { ...config.adapters, [n]: { ...config.adapters[n], kind: v } })}
               options={[{ value: "mock", label: "Sample data (practice only)" }, { value: "http", label: "Real system (needs setup by Neato)" }, { value: "disabled", label: "Off" }]}
               hint={config.adapters[n].kind === "mock" ? "Sample data gives made-up answers. Switch to a real system before real callers use this agent." : undefined} />
@@ -465,7 +483,7 @@ function JsonSection({ config, onValid }: { config: AgentConfig; onValid: (c: Ag
             setError(true);
           }
         }} />
-      <p role="alert" className="mt-2 text-sm text-danger empty:hidden">
+      <p role="alert" className="mt-2 text-sm text-danger empty:sr-only">
         {error ? "These settings can't be read yet, so nothing is applied. Check for a missing comma or quote." : ""}
       </p>
     </div>
@@ -477,39 +495,62 @@ function AskAi({ config, onApply }: { config: AgentConfig; onApply: (c: AgentCon
   const [request, setRequest] = useState("");
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState("");
   const [proposal, setProposal] = useState<{ config: AgentConfig; summary: string } | null>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const regionRef = useRef<HTMLDivElement>(null);
   const changes = proposal ? diffJson(config as unknown as Json, proposal.config as unknown as Json) : [];
+
+  // When a suggestion arrives, move focus to it so keyboard and screen reader users land on it.
+  useEffect(() => {
+    if (proposal) regionRef.current?.focus();
+  }, [proposal]);
 
   async function ask() {
     setError(null);
     setProposal(null);
+    setStatus("Working on it. This can take up to a minute.");
     setThinking(true);
     const res = await askAiToChange(config, request);
     setThinking(false);
-    if (!res.ok) return setError(res.error);
-    setProposal({ config: res.config as AgentConfig, summary: res.summary });
+    if (!res.ok) {
+      setStatus("");
+      return setError(res.error);
+    }
+    const next = res.config as AgentConfig;
+    const n = diffJson(config as unknown as Json, next as unknown as Json).length;
+    setStatus(n === 0 ? "AI didn't suggest any changes." : `AI suggested ${n} change${n === 1 ? "" : "s"}. Review them below.`);
+    setProposal({ config: next, summary: res.summary });
   }
+
+  // The button that was focused disappears with the suggestion, so put focus somewhere sensible.
+  const finish = (message: string) => {
+    setProposal(null);
+    setStatus(message);
+    textRef.current?.focus();
+  };
 
   return (
     <details className="glass p-4">
       <summary className="cursor-pointer text-sm font-medium focus-visible:outline-2 focus-visible:outline-accent">
         Ask AI to change this agent
       </summary>
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 space-y-3" aria-busy={thinking}>
         <div>
           <label className="label" htmlFor={id}>What should change?</label>
           <textarea
-            id={id} rows={3} maxLength={2000} className="field" value={request} onChange={(e) => setRequest(e.target.value)}
+            ref={textRef} id={id} rows={3} maxLength={2000} className="field" value={request} onChange={(e) => setRequest(e.target.value)}
             placeholder="For example: make the greeting shorter, and add a rule that we never quote prices over the phone."
           />
           <p className="hint">AI suggests changes. Nothing is applied until you choose Apply, and nothing is saved until you save.</p>
         </div>
         <button className="btn btn-primary" onClick={ask} disabled={thinking || request.trim().length < 5}>
-          {thinking ? "Thinking… this can take up to a minute" : "Suggest changes"}
+          {thinking ? "Working on it… this can take up to a minute" : "Suggest changes"}
         </button>
-        <p role="alert" className="text-sm text-danger empty:hidden">{error ?? ""}</p>
+        <p role="status" aria-live="polite" className="text-sm text-muted empty:sr-only">{status}</p>
+        <p role="alert" className="text-sm text-danger empty:sr-only">{error ?? ""}</p>
         {proposal && (
-          <div className="space-y-3" role="region" aria-label="Suggested changes">
+          <div ref={regionRef} tabIndex={-1} className="space-y-3 outline-none" role="region" aria-label="Suggested changes">
             <p className="text-sm">{proposal.summary || "Here is what AI suggests."}</p>
             {changes.length === 0 ? (
               <p className="text-sm text-muted">AI didn&apos;t change anything. Try describing the change differently.</p>
@@ -518,11 +559,11 @@ function AskAi({ config, onApply }: { config: AgentConfig; onApply: (c: AgentCon
             )}
             <div className="flex gap-2">
               {changes.length > 0 && (
-                <button className="btn btn-primary" onClick={() => { onApply(proposal.config); setProposal(null); setRequest(""); }}>
+                <button className="btn btn-primary" onClick={() => { onApply(proposal.config); setRequest(""); finish("Applied to the editor. Review it, then choose Save changes."); }}>
                   Apply to editor
                 </button>
               )}
-              <button className="btn" onClick={() => setProposal(null)}>Discard</button>
+              <button className="btn" onClick={() => finish("Discarded. Nothing changed.")}>Discard</button>
             </div>
           </div>
         )}
@@ -555,7 +596,7 @@ function PreviewPane({ preview }: { preview: PreviewResult | null }) {
       <div className="border-b border-line p-3">
         <h2 id={`${base}-h`} className="text-sm font-medium">Preview: what your agent is told</h2>
         <p className="mb-2 mt-0.5 text-xs text-faint">Exactly what it reads before every call. It updates as you edit.</p>
-        <div role="tablist" aria-label="Preview sections" className="flex gap-1 overflow-x-auto" onKeyDown={onKey}>
+        <div role="tablist" aria-label="Preview sections" className="flex flex-wrap gap-1" onKeyDown={onKey}>
           {TABS.map(([k, label]) => (
             <button
               key={k} id={`${base}-tab-${k}`} role="tab" aria-selected={tab === k} aria-controls={`${base}-panel`}
@@ -595,7 +636,7 @@ function PreviewPane({ preview }: { preview: PreviewResult | null }) {
           <ul className="space-y-3 text-sm">
             {ok.tools.length === 0 && <li className="text-muted">No custom actions. The agent can still take messages and transfer calls.</li>}
             {ok.tools.map((t) => (
-              <li key={t.name}><code className="font-mono">{t.name}</code><p className="text-muted">{t.description}</p></li>
+              <li key={t.name}><strong className="font-medium">{friendlyName(t.name)}</strong><p className="text-muted">{t.description}</p></li>
             ))}
           </ul>
         )}
