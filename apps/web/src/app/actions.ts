@@ -7,7 +7,7 @@ import type { Compiled, ValidationIssue } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
 import { TEMPLATES } from "@/lib/templates";
 
-export type FormState = { error?: string; notice?: string } | undefined;
+export type FormState = { error?: string; notice?: string; email?: string } | undefined;
 
 const text = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
@@ -19,16 +19,18 @@ export async function signIn(_: FormState, form: FormData): Promise<FormState> {
     email: text(form, "email"),
     password: String(form.get("password") ?? ""),
   });
-  if (error) return { error: "That email and password don't match." };
+  if (error) return { error: "That email and password don't match.", email: text(form, "email") };
   redirect("/");
 }
 
 export async function signUp(_: FormState, form: FormData): Promise<FormState> {
   const password = String(form.get("password") ?? "");
-  if (password.length < 8) return { error: "Use at least 8 characters for the password." };
+  if (password.length < 8) {
+    return { error: "Use at least 8 characters for the password.", email: text(form, "email") };
+  }
   const supabase = await supabaseServer();
   const { data, error } = await supabase.auth.signUp({ email: text(form, "email"), password });
-  if (error) return { error: error.message };
+  if (error) return { error: error.message, email: text(form, "email") };
   if (!data.session) return { notice: "Check your email to confirm the account, then sign in." };
   redirect("/");
 }

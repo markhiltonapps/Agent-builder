@@ -89,9 +89,10 @@ export function VersionHistory({
           )}
         </div>
         {error && <p role="alert" className="mb-3 text-sm text-danger">{error}</p>}
+        {!previous && <p className="text-sm text-muted">The starting point. Later versions show what changed from the one before.</p>}
         {previous && changes.length === 0 && <p className="text-sm text-muted">No differences.</p>}
         <ul className="space-y-3">
-          {changes.map((c) => (
+          {(previous ? changes : []).map((c) => (
             <li key={c.path} className="rounded-lg border border-line p-3 text-sm">
               <code className="font-mono text-xs text-faint">{c.path || "config"}</code>
               {c.kind !== "added" && (

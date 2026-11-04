@@ -132,7 +132,11 @@ async def _safe_load(store: ConversationStore, room: str) -> SavedCall | None:
         return None
 
 
-server = AgentServer()
+# The worker's health endpoint listens on 8081 in `start` mode, the builder API's default
+# port. WORKER_PORT moves it when both run on one machine.
+server = AgentServer(
+    **({"port": int(os.environ["WORKER_PORT"])} if os.getenv("WORKER_PORT") else {})
+)
 
 
 @server.rtc_session(agent_name=os.getenv("AGENT_NAME", ""))

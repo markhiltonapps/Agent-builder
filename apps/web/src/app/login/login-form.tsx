@@ -11,7 +11,7 @@ export function LoginForm() {
     <form action={action} className="glass space-y-4 p-6" aria-describedby="form-status">
       <div>
         <label className="label" htmlFor="email">Email</label>
-        <input id="email" name="email" type="email" autoComplete="email" required className="field" />
+        <input id="email" name="email" type="email" autoComplete="email" required className="field" defaultValue={state?.email} />
       </div>
       <div>
         <label className="label" htmlFor="password">Password</label>

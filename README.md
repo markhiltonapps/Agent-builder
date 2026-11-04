@@ -35,7 +35,7 @@ To run a different agent, point `AGENT_CONFIG` at another JSON file, or pass
 Needs a Supabase project with `supabase/migrations/*.sql` applied in order.
 
 ```bash
-cd apps/agent && BUILDER_API_SECRET=<16+ chars> uv run agent-builder-api   # port 8081
+cd apps/agent && BUILDER_API_SECRET=<16+ chars> uv run agent-builder-api   # port 8081 (PORT to change)
 cd apps/web && cp .env.example .env.local   # Supabase URL and publishable key, the same secret
 npm install && npm run dev
 ```

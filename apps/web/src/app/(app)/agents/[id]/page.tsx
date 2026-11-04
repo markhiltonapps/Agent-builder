@@ -38,7 +38,6 @@ export default async function AgentPage({ params }: PageProps<"/agents/[id]">) {
 
   return (
     <Editor
-      key={latest.id}
       agent={{ id: agent.id, name: agent.name }}
       initial={latest.config as AgentConfig}
       latest={{ id: latest.id, version: latest.version }}
