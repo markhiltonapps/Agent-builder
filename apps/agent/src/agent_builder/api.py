@@ -25,6 +25,8 @@ from pydantic import ValidationError
 from .compiler import compile_agent
 from .config import AgentConfig
 from .draft import DraftError, draft
+from .votel import VotelError, votel_config
+from .votel_directory import AgentCard, sync_agent
 
 log = logging.getLogger("agent_builder.api")
 
@@ -132,6 +134,35 @@ async def draft_revise(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "config": d.config, "summary": d.summary})
 
 
+async def directory_sync(request: web.Request) -> web.Response:
+    """POST one agent's details -> create or update its card on Votel's "Voice Agents" board."""
+    cfg = votel_config()
+    if cfg is None:
+        return web.json_response({"ok": False, "error": "Votel is not connected."}, status=503)
+    try:
+        body = await request.json()
+        card = AgentCard(
+            agent_id=str(body["agent_id"]),
+            name=str(body["name"]),
+            workspace=str(body.get("workspace", "")),
+            business=str(body.get("business", "")),
+            about=str(body.get("about", "")),
+            live_version=body.get("live_version"),
+            app_url=str(body["app_url"]),
+            retired=bool(body.get("retired")),
+        )
+    except (ValueError, KeyError, TypeError):
+        raise web.HTTPBadRequest(
+            text='{"error": "agent_id, name and app_url are required"}',
+            content_type="application/json",
+        ) from None
+    try:
+        result = await sync_agent(cfg, card)
+    except VotelError as e:
+        return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
+    return web.json_response({"ok": True, "result": result})
+
+
 async def schema(_request: web.Request) -> web.Response:
     return web.json_response(AgentConfig.model_json_schema())
 
@@ -155,6 +186,7 @@ def make_app(secret: str) -> web.Application:
     app = web.Application(middlewares=[auth], client_max_size=MAX_BODY_BYTES)
     app.router.add_post("/v1/validate", validate)
     app.router.add_post("/v1/compile", compile_)
+    app.router.add_post("/v1/directory/sync", directory_sync)
     app.router.add_post("/v1/draft", draft_new)
     app.router.add_post("/v1/revise", draft_revise)
     app.router.add_get("/v1/schema", schema)

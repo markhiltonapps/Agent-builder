@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { compileConfig, draftConfig, reviseConfig } from "@/lib/builder-api";
+import { pushCard } from "@/lib/directory";
 import { callToken } from "@/lib/livekit";
 import type { Compiled, ValidationIssue } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -117,6 +119,7 @@ export async function createAgent(_: FormState, form: FormData): Promise<FormSta
     p_note: note,
   });
   if (vErr) return { error: "The agent was created but its first version didn't save. Open it from the Agents page and save again." };
+  after(() => pushCard(supabase, agent.id));
   redirect(`/agents/${agent.id}`);
 }
 
@@ -146,6 +149,7 @@ export async function duplicateAgent(form: FormData): Promise<void> {
     p_config: latest.config,
     p_note: `Copied from ${source.name}, version ${latest.version}`,
   });
+  after(() => pushCard(supabase, copy.id));
   redirect(`/agents/${copy.id}?copied=1`);
 }
 
@@ -210,6 +214,7 @@ export async function publishVersion(agentId: string, versionId: string): Promis
     p_version: versionId,
   });
   if (error) return { error: "Couldn't publish. Try again, or ask the workspace owner." };
+  after(() => pushCard(supabase, agentId));
   revalidatePath(`/agents/${agentId}`, "layout");
   return {};
 }
@@ -242,4 +247,24 @@ export async function startCall(agentId: string): Promise<CallResult> {
   } catch {
     return { ok: false, error: "Test calls aren't available yet. Contact Neato." };
   }
+}
+
+export type SyncState = { message?: string; error?: string } | undefined;
+
+/** Send every agent in the person's workspace to Votel's "Voice Agents" board. */
+export async function syncAllToVotel(): Promise<SyncState> {
+  const supabase = await supabaseServer();
+  const { data: agents } = await supabase.from("agents").select("id");
+  if (!agents?.length) return { message: "There are no agents to send yet." };
+  let sent = 0;
+  let firstError: string | undefined;
+  for (const a of agents) {
+    const r = await pushCard(supabase, a.id);
+    if (r.ok) sent++;
+    else firstError ??= r.error;
+  }
+  if (sent === 0) return { error: `We couldn't send your agents to Votel. ${firstError ?? ""}`.trim() };
+  return {
+    message: `Sent ${sent} agent${sent === 1 ? "" : "s"} to the Voice Agents board in Votel.` + (sent < agents.length ? ` ${agents.length - sent} didn't go through.` : ""),
+  };
 }

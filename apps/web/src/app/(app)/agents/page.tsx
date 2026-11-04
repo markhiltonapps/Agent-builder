@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LocalTime } from "@/components/local-time";
 import { supabaseServer } from "@/lib/supabase/server";
 import { TEMPLATES } from "@/lib/templates";
-import { CreateAccountForm, CreateAgentForm } from "./forms";
+import { CreateAccountForm, CreateAgentForm, SyncVotelButton } from "./forms";
 
 export const metadata: Metadata = { title: "Agents" };
 
@@ -34,7 +34,8 @@ export default async function AgentsPage() {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <section aria-labelledby="agents-h">
         <h1 id="agents-h" className="text-2xl font-semibold tracking-tight">Agents</h1>
-        <p className="mb-4 mt-1 text-sm text-muted">{account.name}</p>
+        <p className="mt-1 text-sm text-muted">{account.name}</p>
+        <div className="mb-4 mt-3"><SyncVotelButton /></div>
         {agents?.length ? (
           <ul className="grid gap-3 sm:grid-cols-2">
             {agents.map((a) => {

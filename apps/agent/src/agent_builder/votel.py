@@ -24,7 +24,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
 
 DEFAULT_API_URL = "https://agency.neatoventures.com"
-_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
+UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
 
 
 class VotelError(Exception):
@@ -101,5 +101,5 @@ def _reason(e: BaseException) -> str:
 
 def first_id(text: str) -> str | None:
     """The first UUID in a tool's reply: Votel reports ids in plain text."""
-    m = _UUID.search(text)
+    m = UUID.search(text)
     return m.group(0) if m else None

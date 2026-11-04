@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { createAccount, createAgent } from "../../actions";
+import { createAccount, createAgent, syncAllToVotel } from "../../actions";
 
 export function CreateAccountForm() {
   const [state, action, pending] = useActionState(createAccount, undefined);
@@ -90,6 +90,19 @@ export function CreateAgentForm({
       <button className="btn btn-primary w-full" disabled={pending}>
         {pending ? (mode === "ai" ? "Drafting your agent… this can take up to a minute" : "Creating…") : mode === "ai" ? "Draft my agent" : "Create agent"}
       </button>
+    </form>
+  );
+}
+
+/** One click sends every agent to Votel's "Voice Agents" board. */
+export function SyncVotelButton() {
+  const [state, action, pending] = useActionState(syncAllToVotel, undefined);
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-3" aria-busy={pending}>
+      <button className="btn" disabled={pending}>{pending ? "Sending to Votel…" : "Send agents to Votel"}</button>
+      <p role="status" aria-live="polite" className={`text-sm empty:sr-only ${state?.error ? "text-danger" : "text-ok"}`}>
+        {state?.error ?? state?.message ?? ""}
+      </p>
     </form>
   );
 }
