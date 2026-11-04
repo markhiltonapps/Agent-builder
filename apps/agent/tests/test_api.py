@@ -51,6 +51,7 @@ async def test_validate_reports_each_problem_with_its_path(client, raw):
     body = await r.json()
     assert r.status == 200 and body["ok"] is False
     assert any(e["path"] == "greetings.opening" and "nope" in e["message"] for e in body["errors"])
+    assert not any(e["message"].startswith("Value error") for e in body["errors"])
 
 
 async def test_cross_field_problems_are_reported_once_fields_are_valid(client, raw):

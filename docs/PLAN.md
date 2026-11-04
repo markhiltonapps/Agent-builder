@@ -36,12 +36,13 @@ publish gate.
 | Step | Delivers | You test |
 |---|---|---|
 | **1. One working agent** (done) | Config schema, compiler, mock adapter, tool wiring, GPT-Live worker, home-services template, call records as JSON | Talk to it in the LiveKit Agents Playground |
-| **2. Builder and DB** | Supabase schema (accounts, agents, versions, publish pointer); worker loads the published version; glass web editor for persona, greetings, guardrails, escalation, tools; compiled-prompt preview; version diff and rollback | Build a second agent without code |
+| **2. Builder and DB** (code done, needs a Supabase project to run) | Supabase schema (accounts, agents, versions, publish pointer); worker loads the published version; glass web editor for persona, greetings, guardrails, escalation, tools; compiled-prompt preview; version diff and rollback | Build a second agent without code |
 | **3. Real calls** | LiveKit SIP number, `http` adapter to customer APIs with a test button, SIP transfer, call log and transcripts in the DB, recordings | Call it from your phone |
 | **4. Evals** | Synthetic caller (LiveKit simulation or our own), three-scenario smoke set, assertions over the tool log, publish gate | A bad edit gets blocked |
 | **5. Client dashboard** | Per-client login and dashboard: calls, goal rate, transfers, minutes, transcripts | A client logs in |
 | **6. Failover (Phase 2)** | See below | Simulated outages |
-| **7. DIY** | Customer self-serve editing of customer-owned fields, approval before deploy, then reseller tenancy and billing | |
+| **7. Votel link** | See below | Build an agent here, see it in Votel; a call lands in the Votel CRM |
+| **8. DIY** | Customer self-serve editing of customer-owned fields, approval before deploy, then reseller tenancy and billing | |
 
 ## Phase 2: redundancy
 
@@ -77,9 +78,31 @@ Requirements that come with it:
 - Later: LiveKit Cloud and SIP carrier redundancy (second trunk; self-hosted LiveKit as a cold
   standby).
 
+## Votel link (Step 7)
+
+Votel.ai stays the hub for CRM, websites and marketing; this builder is the voice engine
+under it. Decided with Mark:
+
+- **Directory, not copies.** A CMS collection in Votel ("Voice Agents") holds one row per agent:
+  name, client, live version, fingerprint, link back to the builder. We do not mirror agents as
+  Votel AI agents, because a copy would drift from what actually answers calls and could be
+  switched on by mistake.
+- **Calls flow into Votel.** After each call, upsert the contact by phone number, add the summary
+  and transcript as a note, move the pipeline stage, and turn transfers and callbacks into Votel
+  tasks. This is a `votel` adapter on Step 3's `http` machinery.
+- **Import as templates.** Votel's agents are prompt sections (Personality, Tone, Goal,
+  Guardrails, Business Facts, FAQs) that map onto our config; Magnolia Court Hotel can seed the
+  hotel receptionist template.
+- One Votel sub-account per builder workspace, so each client's calls reach that client's CRM.
+- The deployed app cannot use the MCP connection (that is for Claude sessions). It needs Votel's
+  REST API and one key per client, kept in Supabase Vault, never in an agent config. Confirm the
+  endpoints with Votel's API reference before building.
+
 ## Still needed from Mark
 
 - LiveKit Cloud and OpenAI keys as environment secrets (`LIVEKIT_URL`, `LIVEKIT_API_KEY`,
   `LIVEKIT_API_SECRET`, `OPENAI_API_KEY`)
 - The hotel receptionist repo from the developer (becomes the second template)
-- The `/impeccable` design skill added to the environment before Step 2's UI work
+- A Supabase project for this app (none of the existing ones is, and a new one is a billed
+  add-on); then apply `supabase/migrations/` in order
+- The `/impeccable` design skill added to the environment (the Step 2 UI was designed without it)

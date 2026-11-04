@@ -31,7 +31,10 @@ MAX_BODY_BYTES = 512 * 1024
 
 def _errors(e: ValidationError) -> list[dict[str, str]]:
     return [
-        {"path": ".".join(str(p) for p in err["loc"]), "message": err["msg"]}
+        {
+            "path": ".".join(str(p) for p in err["loc"]),
+            "message": err["msg"].removeprefix("Value error, "),
+        }
         for err in e.errors(include_url=False)
     ]
 

@@ -85,7 +85,7 @@ export function Editor({ agent, initial, latest, published }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="w-full min-w-0 space-y-4">
       <div className="glass flex flex-wrap items-center justify-between gap-3 p-4">
         <div className="min-w-0">
           <h1 className="truncate text-xl font-semibold tracking-tight">{agent.name}</h1>
@@ -119,8 +119,8 @@ export function Editor({ agent, initial, latest, published }: Props) {
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)_minmax(0,26rem)]">
-        <nav aria-label="Sections" className="lg:sticky lg:top-20 lg:self-start">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[13rem_minmax(0,1fr)_minmax(0,26rem)]">
+        <nav aria-label="Sections" className="min-w-0 lg:sticky lg:top-20 lg:self-start">
           <ul className="flex gap-1 overflow-x-auto lg:flex-col">
             {SECTIONS.map(([key, label]) => {
               const count = issues.filter((i) => topLevel(i.path) === key).length;
