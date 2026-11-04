@@ -25,6 +25,8 @@ from typing import Any, Protocol
 
 import aiohttp
 
+from . import supabase
+
 log = logging.getLogger("agent_builder.session_store")
 
 
@@ -117,9 +119,7 @@ class SupabaseStore:
 
     def __init__(self, url: str, key: str, *, table: str = "live_calls") -> None:
         self._base = f"{url.rstrip('/')}/rest/v1/{table}"
-        self._headers = {"apikey": key, "Content-Type": "application/json"}
-        if not key.startswith("sb_"):  # a legacy service_role JWT also goes as a bearer token
-            self._headers["Authorization"] = f"Bearer {key}"
+        self._headers = supabase.headers(key)
         self._http: aiohttp.ClientSession | None = None
 
     def _session(self) -> aiohttp.ClientSession:
@@ -162,9 +162,9 @@ class SupabaseStore:
 
 
 def store_from_env(default_dir: Path) -> ConversationStore:
-    url, key = os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SECRET_KEY")
-    if url and key:
-        return SupabaseStore(url, key)
+    creds = supabase.credentials()
+    if creds:
+        return SupabaseStore(*creds)
     return FileStore(Path(os.getenv("CONVERSATION_DIR", default_dir)))
 
 

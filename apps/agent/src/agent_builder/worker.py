@@ -34,7 +34,7 @@ from livekit.agents.beta.tools import EndCallTool
 
 from .adapters import restore_adapters, snapshot_adapters
 from .compiler import CompiledAgent, compile_agent
-from .loader import ROOT, load_config
+from .loader import ROOT, resolve_config
 from .providers import build_voice_model
 from .session_store import ConversationStore, SavedCall, Saver, store_from_env
 from .tools import CallRecorder, build_tools
@@ -138,7 +138,8 @@ server = AgentServer()
 @server.rtc_session(agent_name=os.getenv("AGENT_NAME", ""))
 async def entrypoint(ctx: JobContext) -> None:
     room = ctx.room.name
-    cfg = load_config(ctx.job.metadata)
+    loaded = await resolve_config(ctx.job.metadata)
+    cfg = loaded.config
     compiled = compile_agent(cfg, now=datetime.now(UTC))
     recorder = CallRecorder()
     tools, adapters = build_tools(cfg, compiled, recorder)
@@ -192,6 +193,10 @@ async def entrypoint(ctx: JobContext) -> None:
             "agent": cfg.persona.agent_name,
             "business": cfg.persona.business_name,
             "config_fingerprint": compiled.fingerprint,
+            "config_source": loaded.source,
+            "agent_id": loaded.agent_id,
+            "agent_version": loaded.version,
+            "agent_version_id": loaded.version_id,
             "voice_model": cfg.runtime.voice.model_dump(mode="json"),
             "started_at": started,
             "duration_s": round(time.time() - started, 1),
