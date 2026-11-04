@@ -36,8 +36,8 @@ publish gate.
 | Step | Delivers | You test |
 |---|---|---|
 | **1. One working agent** (done) | Config schema, compiler, mock adapter, tool wiring, GPT-Live worker, home-services template, call records as JSON | Talk to it in the LiveKit Agents Playground |
-| **2. Builder and DB** (built; Supabase project `neato-agent-builder` created and migrated) | Supabase schema (accounts, agents, versions, publish pointer); worker loads the published version; glass web editor for persona, greetings, guardrails, escalation, tools; compiled-prompt preview; version diff and rollback | Build a second agent without code |
-| **3. Real calls** | LiveKit SIP number, `http` adapter to customer APIs with a test button, SIP transfer, call log and transcripts in the DB, recordings | Call it from your phone |
+| **2. Builder and DB** (done and live on Railway; first browser call verified) | Supabase schema (accounts, agents, versions, publish pointer); worker loads the published version; glass web editor for persona, greetings, guardrails, escalation, tools; compiled-prompt preview; version diff and rollback | Build a second agent without code |
+| **3. Real calls** (next: call history in the DB, then a phone number) | LiveKit SIP number, `http` adapter to customer APIs with a test button, SIP transfer, call log and transcripts in the DB, recordings | Call it from your phone |
 | **4. Evals** | Synthetic caller (LiveKit simulation or our own), three-scenario smoke set, assertions over the tool log, publish gate | A bad edit gets blocked |
 | **5. Client dashboard** | Per-client login and dashboard: calls, goal rate, transfers, minutes, transcripts | A client logs in |
 | **6. Failover (Phase 2)** | See below | Simulated outages |
