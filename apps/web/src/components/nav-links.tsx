@@ -7,6 +7,7 @@ import { confirmLeave } from "@/lib/unsaved";
 const LINKS = [
   { href: "/agents", label: "Agents" },
   { href: "/calls", label: "Calls" },
+  { href: "/numbers", label: "Numbers" },
 ];
 
 export function NavLinks() {

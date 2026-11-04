@@ -40,7 +40,7 @@ const sectionOf = (path: string): SectionKey => {
   if (head === "greetings") return "greetings";
   if (head === "guardrails") return "rules";
   if (head === "escalation") return "handoffs";
-  if (head === "tools" || head === "adapters") return "actions";
+  if (head === "tools" || head === "adapters" || head === "booking") return "actions";
   if (head === "policy") return "flows";
   if (head === "runtime") return "voice";
   return "advanced";
@@ -403,6 +403,7 @@ function ActionsSection({ config, set, issues }: SectionProps) {
           );
         })}
       </ul>
+      <BookingCard config={config} set={set} issues={issues} />
       {adapterNames.length > 0 && (
         <fieldset className="space-y-3">
           <legend className="label">Connections</legend>
@@ -415,6 +416,39 @@ function ActionsSection({ config, set, issues }: SectionProps) {
         </fieldset>
       )}
     </>
+  );
+}
+
+function BookingCard({ config, set, issues }: SectionProps) {
+  const b = config.booking;
+  return (
+    <div className="space-y-3 rounded-xl border border-line bg-black/20 p-4">
+      <Toggle
+        label="Offer callers a link to book an appointment themselves"
+        hint="The agent sends the link during the call, so callers pick a time on your booking page."
+        checked={Boolean(b)}
+        onChange={(on) => set("booking", on ? { url: "", channel: "sms" } : null)}
+      />
+      {b && (
+        <>
+          <TextField
+            label="Booking page address" value={b.url} path="booking.url" issues={issues} maxLength={300}
+            placeholder="https://…/book/your-service"
+            onChange={(v) => set("booking", { ...b, url: v })}
+            hint="The public page where callers choose a time. In Votel, open Calendars, then Bookables, and copy the link."
+          />
+          <SelectField
+            label="Send it by" value={b.channel} onChange={(v) => set("booking", { ...b, channel: v })}
+            options={[{ value: "sms", label: "Text message" }, { value: "email", label: "Email" }]}
+          />
+          <p className="text-xs text-muted">
+            {b.channel === "sms"
+              ? "Text messages need Votel's text registration (Settings, then Phone, then 10DLC Registration). Until it's done, the agent apologizes and takes a message instead."
+              : "Email needs a sender connected in Votel (Settings, then Channels). The agent asks the caller for their address and reads it back."}
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 

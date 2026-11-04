@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -13,7 +14,9 @@ from livekit.agents.llm import RawFunctionTool
 
 from .adapters import Adapter, ToolFailed, build_adapter
 from .compiler import CompiledAgent
-from .config import AgentConfig, ToolDefinition
+from .config import AgentConfig, BookingLink, ToolDefinition
+from .votel import VotelError, call_tool, votel_config
+from .votel_sync import normalize_phone
 
 log = logging.getLogger("agent_builder.tools")
 
@@ -172,8 +175,94 @@ def _message_tool(recorder: CallRecorder) -> RawFunctionTool:
     )
 
 
+def _booking_tool(
+    booking: BookingLink, cfg: AgentConfig, recorder: CallRecorder, caller: Callable[[], str | None]
+) -> RawFunctionTool:
+    """Send the caller a link to book online, by text or email, through Votel.
+
+    On a phone call the number is already known, so nothing is asked for. If Votel cannot send
+    (texting not registered, no email sender), the tool fails and the agent is told to take a
+    message instead, so a caller is never promised something that did not happen.
+    """
+    sms = booking.channel == "sms"
+    business = cfg.persona.business_name
+
+    async def handler(raw_arguments: dict[str, object], context: RunContext) -> str:
+        args = {k: str(v).strip() for k, v in raw_arguments.items() if str(v).strip()}
+        started = time.perf_counter()
+        try:
+            votel = votel_config()
+            if votel is None:
+                raise VotelError("Votel is not connected")
+            if sms:
+                phone = normalize_phone(caller()) or normalize_phone(args.get("phone"))
+                if not phone:
+                    raise ToolFailed("I need the caller's mobile number first")
+                body = f"Thanks for calling {business}. Book a time here: {booking.url}"
+                await call_tool(votel, "send_sms", {"to": phone, "body": body})
+                sent_to = phone
+            else:
+                email = args.get("email", "")
+                if "@" not in email:
+                    raise ToolFailed("I need the caller's email address first")
+                body = f"Thanks for calling {business}.\n\nBook a time here: {booking.url}"
+                await call_tool(
+                    votel,
+                    "send_email",
+                    {"to": email, "subject": f"Book with {business}", "body": body},
+                )
+                sent_to = email
+            result, ok = {"status": "sent", "sent_to": sent_to, "say": "I've sent that over."}, True
+        except ToolFailed as e:
+            result, ok = {"error": str(e)}, False
+        except VotelError as e:
+            log.warning("booking link not sent: %s", e)
+            result, ok = {"error": "the message could not be sent right now"}, False
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        recorder.calls.append(ToolCallRecord("send_booking_link", args, ok, result, latency_ms, ok))
+        if not ok:
+            raise ToolError(
+                f"send_booking_link failed: {result['error']}. Apologize, say a team member will "
+                "follow up, and take a message with take_message."
+            )
+        return json.dumps(result)
+
+    how = "text message" if sms else "email"
+    ask = (
+        {
+            "phone": {
+                "type": "string",
+                "description": "Mobile number, only if the caller's own number is not known.",
+            }
+        }
+        if sms
+        else {
+            "email": {
+                "type": "string",
+                "description": "Email address, read back to the caller first.",
+            }
+        }
+    )
+    return function_tool(
+        handler,
+        raw_schema={
+            "name": "send_booking_link",
+            "description": f"Send the caller a {how} with a link to book an appointment online themselves. Use when they want to schedule something.",
+            "parameters": {
+                "type": "object",
+                "properties": ask,
+                "required": [] if sms else ["email"],
+                "additionalProperties": False,
+            },
+        },
+    )
+
+
 def build_tools(
-    cfg: AgentConfig, compiled: CompiledAgent, recorder: CallRecorder
+    cfg: AgentConfig,
+    compiled: CompiledAgent,
+    recorder: CallRecorder,
+    caller: Callable[[], str | None] | None = None,
 ) -> tuple[list[Any], dict[str, Adapter]]:
     """Return the LiveKit tools for one call and the adapters backing them.
 
@@ -187,4 +276,6 @@ def build_tools(
     tools: list[Any] = [_make_tool(t, adapters[t.adapter], recorder) for t in compiled.tools]
     tools.append(_transfer_tool(cfg, recorder))
     tools.append(_message_tool(recorder))
+    if cfg.booking:
+        tools.append(_booking_tool(cfg.booking, cfg, recorder, caller or (lambda: None)))
     return tools, adapters

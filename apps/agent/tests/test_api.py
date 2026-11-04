@@ -79,3 +79,18 @@ async def test_malformed_bodies_are_400(client):
 async def test_schema_endpoint(client):
     body = await (await client.get("/v1/schema", headers=AUTH)).json()
     assert "persona" in body["properties"]
+
+
+async def test_a_booking_link_is_validated_with_a_plain_message_and_reaches_the_prompt(client, raw):
+    raw["booking"] = {"url": "", "channel": "sms"}
+    r = await client.post("/v1/validate", json={"config": raw}, headers=AUTH)
+    body = await r.json()
+    assert body["ok"] is False
+    assert any(
+        e["path"] == "booking.url" and "starting with https://" in e["message"]
+        for e in body["errors"]
+    )
+
+    raw["booking"] = {"url": "https://book.example.com/book/estimate", "channel": "sms"}
+    r = await client.post("/v1/compile", json={"config": raw}, headers=AUTH)
+    assert r.status == 200 and "link by text" in (await r.json())["voice_instructions"]

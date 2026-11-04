@@ -128,7 +128,14 @@ def compile_agent(cfg: AgentConfig, now: datetime | None = None) -> CompiledAgen
         escalation_lines.append(f"- If {rule.condition.strip().rstrip('.')}: {verb}.")
     escalation = "\n".join(escalation_lines)
 
-    capabilities = "\n".join(f"- {t.description.strip()}" for t in tools)
+    abilities = [t.description.strip() for t in tools]
+    if cfg.booking:
+        how = "text" if cfg.booking.channel == "sms" else "email"
+        abilities.append(
+            f"Send the caller a link by {how} so they can book an appointment online "
+            "themselves. Offer it when they want to schedule something."
+        )
+    capabilities = "\n".join(f"- {a}" for a in abilities)
     if capabilities:
         capabilities = (
             "You can do the following for callers. When a request needs one of these, "

@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
+from livekit import rtc
 from livekit.agents import (
     Agent,
     AgentServer,
@@ -139,6 +140,15 @@ async def _safe_load(store: ConversationStore, room: str) -> SavedCall | None:
 
 # The worker's health endpoint listens on 8081 in `start` mode, the builder API's default
 # port. WORKER_PORT moves it when both run on one machine.
+def sip_caller(room: rtc.Room) -> str | None:
+    """The caller's number, when a phone call reached this room (LiveKit puts it on the
+    phone participant's attributes); None for a browser call."""
+    for p in room.remote_participants.values():
+        if p.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP:
+            return p.attributes.get("sip.phoneNumber") or None
+    return None
+
+
 async def after_call(loaded, record: dict) -> None:
     """Everything that happens once a call is over. Each step is best effort: the call is
     already recorded in the JSON file, and nothing here may raise."""
@@ -182,7 +192,18 @@ async def entrypoint(ctx: JobContext) -> None:
     cfg = loaded.config
     compiled = compile_agent(cfg, now=datetime.now(UTC))
     recorder = CallRecorder()
-    tools, adapters = build_tools(cfg, compiled, recorder)
+    caller: dict[str, str | None] = {"number": None}
+
+    def note_caller(*_args) -> None:
+        caller["number"] = caller["number"] or sip_caller(ctx.room)
+
+    def caller_number() -> str | None:
+        return caller["number"] or sip_caller(ctx.room)
+
+    ctx.room.on("participant_connected", note_caller)
+    ctx.room.on("participant_attributes_changed", note_caller)
+    note_caller()
+    tools, adapters = build_tools(cfg, compiled, recorder, lambda: caller_number())
     tools.append(EndCallTool(end_instructions=None, ignore_on_enter=True))
     store = store_from_env(CONVERSATION_DIR)
 
@@ -241,6 +262,7 @@ async def entrypoint(ctx: JobContext) -> None:
             "started_at": started,
             "duration_s": round(time.time() - started, 1),
             "recoveries": recoveries,
+            "caller_number": caller["number"] or sip_caller(ctx.room),
             "goal_reached": recorder.goal_reached,
             "transferred": recorder.transferred,
             "transfer_reason": recorder.transfer_reason,

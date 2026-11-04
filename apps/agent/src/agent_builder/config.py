@@ -150,6 +150,21 @@ class RuntimeSettings(_Strict):
     silence_timeout_seconds: Annotated[int, Field(ge=5, le=120)] = 15
 
 
+class BookingLink(_Strict):
+    """Let the agent send callers a link to book an appointment themselves (through Votel)."""
+
+    url: Annotated[str, Field(max_length=300)]
+    channel: Literal["sms", "email"] = "sms"
+
+    @field_validator("url")
+    @classmethod
+    def _https(cls, v: str) -> str:
+        v = v.strip()
+        if not v.startswith("https://") or len(v) < 12 or " " in v:
+            raise ValueError("the booking link must be a web address starting with https://")
+        return v
+
+
 class AgentConfig(_Strict):
     schema_version: Literal[1] = SCHEMA_VERSION
     persona: Persona
@@ -160,6 +175,7 @@ class AgentConfig(_Strict):
     tools: list[ToolDefinition] = Field(default_factory=list, max_length=40)
     adapters: dict[ToolName, AdapterConfig] = Field(default_factory=dict)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
+    booking: BookingLink | None = None
 
     @model_validator(mode="after")
     def _tools_bind_to_known_adapters(self) -> AgentConfig:
@@ -167,7 +183,9 @@ class AgentConfig(_Strict):
         dupes = {n for n in names if names.count(n) > 1}
         if dupes:
             raise ValueError(f"duplicate tool name(s): {', '.join(sorted(dupes))}")
-        reserved = {"end_call", "transfer_to_human"} & set(names)
+        reserved = {"end_call", "transfer_to_human", "take_message", "send_booking_link"} & set(
+            names
+        )
         if reserved:
             raise ValueError(f"reserved built-in tool name(s): {', '.join(sorted(reserved))}")
         missing = {t.adapter for t in self.tools} - set(self.adapters)
