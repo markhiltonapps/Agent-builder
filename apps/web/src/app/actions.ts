@@ -89,7 +89,7 @@ export async function previewConfig(config: unknown): Promise<PreviewResult> {
 }
 
 export type SaveResult =
-  | { ok: true; version: number }
+  | { ok: true; version: number; id: string }
   | { ok: false; error: string; issues?: ValidationIssue[] };
 
 export async function saveVersion(agentId: string, config: unknown, note: string): Promise<SaveResult> {
@@ -110,7 +110,8 @@ export async function saveVersion(agentId: string, config: unknown, note: string
     return { ok: false, error: "You don't have permission to save changes to this agent." };
   }
   revalidatePath(`/agents/${agentId}`, "layout");
-  return { ok: true, version: (data as { version: number }).version };
+  const row = data as { version: number; id: string };
+  return { ok: true, version: row.version, id: row.id };
 }
 
 export async function publishVersion(agentId: string, versionId: string): Promise<{ error?: string }> {
