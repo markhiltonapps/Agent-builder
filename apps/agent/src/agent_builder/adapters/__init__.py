@@ -19,6 +19,17 @@ class Adapter(Protocol):
     async def call(self, tool: str, args: dict[str, Any]) -> dict[str, Any]: ...
 
 
+def snapshot_adapters(adapters: dict[str, Adapter]) -> dict[str, Any]:
+    """State to carry across a session restart. Only adapters that hold call state have it."""
+    return {n: a.snapshot() for n, a in adapters.items() if hasattr(a, "snapshot")}
+
+
+def restore_adapters(adapters: dict[str, Adapter], saved: dict[str, Any]) -> None:
+    for name, snap in saved.items():
+        if name in adapters and hasattr(adapters[name], "restore"):
+            adapters[name].restore(snap)
+
+
 def build_adapter(name: str, cfg: AdapterConfig) -> Adapter:
     if cfg.kind == "mock":
         from .mock import MockAdapter

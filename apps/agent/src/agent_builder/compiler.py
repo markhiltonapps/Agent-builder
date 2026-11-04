@@ -104,7 +104,10 @@ def compile_agent(cfg: AgentConfig, now: datetime | None = None) -> CompiledAgen
 
     calls = "\n".join(
         [
-            f'- Open the call with: "{_fill(cfg.greetings.opening, cfg)}"',
+            (
+                f'- Open the call with: "{_fill(cfg.greetings.opening, cfg)}" '
+                "Say this only once, at the very start of the call; never repeat it."
+            ),
             f'- If the caller goes quiet, say: "{_fill(cfg.greetings.still_there, cfg)}"',
             (
                 f'- When the caller is done, say: "{_fill(cfg.greetings.goodbye, cfg)}" '

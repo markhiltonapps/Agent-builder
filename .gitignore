@@ -7,6 +7,7 @@ __pycache__/
 .env.*
 !.env.example
 call_logs/
+conversations/
 node_modules/
 .next/
 .turbo/

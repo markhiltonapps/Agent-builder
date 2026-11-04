@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from livekit.agents import RunContext, ToolError, function_tool
@@ -42,6 +42,30 @@ class CallRecorder:
     @property
     def goal_reached(self) -> bool:
         return any(c.goal and c.ok for c in self.calls)
+
+    def to_json(self) -> list[dict[str, Any]]:
+        return [asdict(c) for c in self.calls]
+
+    def restore(self, calls: list[dict[str, Any]], transferred: bool, reason: str | None) -> None:
+        self.calls = [ToolCallRecord(**c) for c in calls]
+        self.transferred = transferred
+        self.transfer_reason = reason
+
+    def completed_summary(self, limit: int = 10) -> str:
+        """What already happened on this call, in plain lines, for a resumed session.
+
+        The transcript carries this too, but a long call can outgrow what a new session
+        accepts, and these are the facts the agent must never redo or contradict.
+        """
+        lines = []
+        for c in [c for c in self.calls if c.ok][-limit:]:
+            result = c.result
+            ref = result.get("id") if isinstance(result, dict) else None
+            args = ", ".join(f"{k}={v}" for k, v in c.args.items())
+            lines.append(f"- {c.tool}({args})" + (f" -> {ref}" if ref else ""))
+        if self.transferred:
+            lines.append(f"- transfer requested: {self.transfer_reason}")
+        return "\n".join(lines)
 
 
 def _make_tool(defn: ToolDefinition, adapter: Adapter, recorder: CallRecorder) -> RawFunctionTool:
