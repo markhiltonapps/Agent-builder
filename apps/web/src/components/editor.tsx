@@ -98,6 +98,7 @@ export function Editor({ agent, initial, latest, published }: Props) {
             )}
             <Link href={`/agents/${agent.id}/versions`} className="link">History & rollback</Link>
             <Link href={`/agents/${agent.id}/talk`} className="link">Talk to it</Link>
+            <Link href={`/calls?agent=${agent.id}`} className="link">Calls</Link>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

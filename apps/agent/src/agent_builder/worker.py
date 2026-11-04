@@ -33,6 +33,7 @@ from livekit.agents import (
 from livekit.agents.beta.tools import EndCallTool
 
 from .adapters import restore_adapters, snapshot_adapters
+from .calls_store import save_call
 from .compiler import CompiledAgent, compile_agent
 from .loader import ROOT, resolve_config
 from .preflight import run as run_preflight
@@ -215,6 +216,8 @@ async def entrypoint(ctx: JobContext) -> None:
         path = CALL_LOG_DIR / f"{int(started)}-{room}.json"
         path.write_text(json.dumps(record, indent=2, default=str))
         log.info("call record written to %s", path)
+        if await save_call(loaded, record):
+            log.info("call saved to the database")
 
     ctx.add_shutdown_callback(finish_call)
 

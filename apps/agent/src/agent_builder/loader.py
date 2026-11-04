@@ -38,6 +38,7 @@ class LoadedConfig:
     source: str
     """``file``, ``inline`` or ``published``."""
     agent_id: str | None = None
+    account_id: str | None = None
     version_id: str | None = None
     version: int | None = None
 
@@ -98,6 +99,7 @@ class PublishedSource:
             config=AgentConfig.model_validate(row["config"]),
             source="published",
             agent_id=row["agent_id"],
+            account_id=row.get("account_id"),
             version_id=row["version_id"],
             version=row["version"],
         )
