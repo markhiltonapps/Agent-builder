@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { compileConfig } from "@/lib/builder-api";
+import { callToken } from "@/lib/livekit";
 import type { Compiled, ValidationIssue } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
 import { TEMPLATES } from "@/lib/templates";
@@ -143,4 +144,34 @@ export async function publishVersion(agentId: string, versionId: string): Promis
   if (error) return { error: "Could not publish. You may not have permission." };
   revalidatePath(`/agents/${agentId}`, "layout");
   return {};
+}
+
+// --- calls ----------------------------------------------------------------------------
+
+export type CallResult =
+  | { ok: true; url: string; token: string; room: string }
+  | { ok: false; error: string };
+
+/** Start a test call with a published agent from the browser. */
+export async function startCall(agentId: string): Promise<CallResult> {
+  const supabase = await supabaseServer();
+  const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims?.sub;
+  if (!userId) return { ok: false, error: "Sign in again to start a call." };
+
+  // Row-level security means this only finds agents in the person's own workspaces.
+  const { data: agent } = await supabase
+    .from("agents")
+    .select("id, published_version_id")
+    .eq("id", agentId)
+    .maybeSingle();
+  if (!agent) return { ok: false, error: "That agent was not found." };
+  if (!agent.published_version_id) {
+    return { ok: false, error: "Publish a version first. Calls run the published version." };
+  }
+  try {
+    return { ok: true, ...(await callToken({ agentId, userId })) };
+  } catch {
+    return { ok: false, error: "Calling is not set up on this server yet." };
+  }
 }
