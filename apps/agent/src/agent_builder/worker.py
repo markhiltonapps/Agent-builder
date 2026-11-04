@@ -35,6 +35,7 @@ from livekit.agents.beta.tools import EndCallTool
 from .adapters import restore_adapters, snapshot_adapters
 from .compiler import CompiledAgent, compile_agent
 from .loader import ROOT, resolve_config
+from .preflight import run as run_preflight
 from .providers import build_voice_model
 from .session_store import ConversationStore, SavedCall, Saver, store_from_env
 from .tools import CallRecorder, build_tools
@@ -276,6 +277,7 @@ async def entrypoint(ctx: JobContext) -> None:
 
 
 def main() -> None:
+    run_preflight()
     cli.run_app(server)
 
 
