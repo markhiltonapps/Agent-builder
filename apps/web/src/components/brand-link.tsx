@@ -6,14 +6,12 @@ import { confirmLeave } from "@/lib/unsaved";
 export function BrandLink() {
   return (
     <Link
-      href="/agents"
+      href="/dashboard"
       onClick={(e) => { if (!confirmLeave()) e.preventDefault(); }}
-      className="flex items-center gap-2 whitespace-nowrap font-semibold tracking-tight"
+      className="flex items-center justify-center gap-2 whitespace-nowrap font-semibold tracking-tight max-sm:hidden focus-visible:outline-2 focus-visible:outline-accent"
     >
       <span aria-hidden className="inline-block size-2.5 rounded-full bg-accent" />
-      <span>
-        Neato<span className="hidden sm:inline"> Agent Builder</span>
-      </span>
+      <span>Neato Agent Builder</span>
     </Link>
   );
 }
