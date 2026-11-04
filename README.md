@@ -44,6 +44,24 @@ Sign up, name a workspace, create an agent from a template, edit it, **Save vers
 **Publish**. To run the published version on a call, set `SUPABASE_URL`, `SUPABASE_SECRET_KEY`
 and `AGENT_ID` for the worker (or dispatch with `{"agent_id": "..."}`).
 
+## Deployment (Railway)
+
+Project `neato-agent-builder`, two services built from the repo root with the Dockerfiles in
+`apps/agent` and `apps/web`:
+
+| Service | Public | Notes |
+|---|---|---|
+| `web` | yes (`*.up.railway.app`) | Needs `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` at **build** time, plus `BUILDER_API_URL`, `BUILDER_API_SECRET`, `PORT=3000` |
+| `builder-api` | no (private network only) | `BUILDER_API_SECRET` (same value as `web`), `PORT=8081`; web reaches it at `http://builder-api.railway.internal:8081` |
+
+Sign-up is invite-only. `ALLOW_SIGNUP=true` on `web` shows the sign-up form (set it only while
+inviting someone). Regardless, the database lets only emails in `public.signup_allowlist` create
+a workspace. Add a person with
+`insert into public.signup_allowlist (email) values ('name@company.com');`.
+
+The LiveKit worker is the same image as the API with the start command
+`uv run --no-sync agent-builder start` (needs the LiveKit, OpenAI and Supabase keys).
+
 ## Tests
 
 ```bash
