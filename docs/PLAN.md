@@ -36,7 +36,7 @@ publish gate.
 | Step | Delivers | You test |
 |---|---|---|
 | **1. One working agent** (done) | Config schema, compiler, mock adapter, tool wiring, GPT-Live worker, home-services template, call records as JSON | Talk to it in the LiveKit Agents Playground |
-| **2. Builder and DB** (code done, needs a Supabase project to run) | Supabase schema (accounts, agents, versions, publish pointer); worker loads the published version; glass web editor for persona, greetings, guardrails, escalation, tools; compiled-prompt preview; version diff and rollback | Build a second agent without code |
+| **2. Builder and DB** (built; Supabase project `neato-agent-builder` created and migrated) | Supabase schema (accounts, agents, versions, publish pointer); worker loads the published version; glass web editor for persona, greetings, guardrails, escalation, tools; compiled-prompt preview; version diff and rollback | Build a second agent without code |
 | **3. Real calls** | LiveKit SIP number, `http` adapter to customer APIs with a test button, SIP transfer, call log and transcripts in the DB, recordings | Call it from your phone |
 | **4. Evals** | Synthetic caller (LiveKit simulation or our own), three-scenario smoke set, assertions over the tool log, publish gate | A bad edit gets blocked |
 | **5. Client dashboard** | Per-client login and dashboard: calls, goal rate, transfers, minutes, transcripts | A client logs in |
@@ -103,6 +103,5 @@ under it. Decided with Mark:
 - LiveKit Cloud and OpenAI keys as environment secrets (`LIVEKIT_URL`, `LIVEKIT_API_KEY`,
   `LIVEKIT_API_SECRET`, `OPENAI_API_KEY`)
 - The hotel receptionist repo from the developer (becomes the second template)
-- A Supabase project for this app (none of the existing ones is, and a new one is a billed
-  add-on); then apply `supabase/migrations/` in order
+- The new Supabase project's secret key and the web app's environment variables (see README)
 - The `/impeccable` design skill added to the environment (the Step 2 UI was designed without it)
