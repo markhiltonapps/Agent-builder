@@ -36,7 +36,20 @@ export async function signUp(_: FormState, form: FormData): Promise<FormState> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase.auth.signUp({ email: text(form, "email"), password });
   if (error) return { error: error.message, email: text(form, "email") };
-  if (!data.session) return { notice: "Check your email to confirm the account, then sign in." };
+  // Supabase hides whether an email is registered: for an existing account it returns a
+  // user with no identities, no session, and sends no new confirmation.
+  if (data.user && data.user.identities?.length === 0) {
+    return {
+      error: "That email already has an account. Use Sign in instead.",
+      email: text(form, "email"),
+    };
+  }
+  if (!data.session) {
+    return {
+      notice: "Account created. Open the confirmation email, then come back here and use Sign in.",
+      email: text(form, "email"),
+    };
+  }
   redirect("/");
 }
 
