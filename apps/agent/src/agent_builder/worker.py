@@ -33,13 +33,16 @@ from livekit.agents import (
 from livekit.agents.beta.tools import EndCallTool
 
 from .adapters import restore_adapters, snapshot_adapters
-from .calls_store import save_call
+from .calls_store import mark_synced, save_call, source_for, transcript_lines
 from .compiler import CompiledAgent, compile_agent
 from .loader import ROOT, resolve_config
 from .preflight import run as run_preflight
 from .providers import build_voice_model
 from .session_store import ConversationStore, SavedCall, Saver, store_from_env
+from .summary import summarize
 from .tools import CallRecorder, build_tools
+from .votel import votel_config
+from .votel_sync import sync_call
 
 load_dotenv(ROOT / ".env")
 log = logging.getLogger("agent_builder")
@@ -136,6 +139,37 @@ async def _safe_load(store: ConversationStore, room: str) -> SavedCall | None:
 
 # The worker's health endpoint listens on 8081 in `start` mode, the builder API's default
 # port. WORKER_PORT moves it when both run on one machine.
+async def after_call(loaded, record: dict) -> None:
+    """Everything that happens once a call is over. Each step is best effort: the call is
+    already recorded in the JSON file, and nothing here may raise."""
+    try:
+        record["summary"] = await summarize(transcript_lines(record["transcript"]))
+        call_id = await save_call(loaded, record)
+        if call_id is None:
+            return
+        log.info("call saved to the database")
+        cfg = votel_config()
+        if cfg is None:
+            return
+        result = await sync_call(
+            cfg,
+            loaded,
+            record,
+            call_id,
+            source=source_for(record["room"]),
+            app_url=os.getenv("APP_URL"),
+        )
+        if result.skipped:
+            log.info("not sent to Votel: %s", result.skipped)
+        else:
+            await mark_synced(call_id, contact_id=result.contact_id, error=result.error)
+            log.info(
+                "sent to Votel" if result.error is None else "Votel sync failed: %s", result.error
+            )
+    except Exception:
+        log.exception("finishing the call failed")
+
+
 server = AgentServer(
     **({"port": int(os.environ["WORKER_PORT"])} if os.getenv("WORKER_PORT") else {})
 )
@@ -216,8 +250,7 @@ async def entrypoint(ctx: JobContext) -> None:
         path = CALL_LOG_DIR / f"{int(started)}-{room}.json"
         path.write_text(json.dumps(record, indent=2, default=str))
         log.info("call record written to %s", path)
-        if await save_call(loaded, record):
-            log.info("call saved to the database")
+        await after_call(loaded, record)
 
     ctx.add_shutdown_callback(finish_call)
 

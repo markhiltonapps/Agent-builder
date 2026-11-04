@@ -75,7 +75,11 @@ class FakeDb:
                 "body": await request.json(),
             }
         )
-        return web.Response(status=self.status, text="boom" if self.status >= 300 else "")
+        return (
+            web.json_response([{"id": "call-id-1"}], status=self.status)
+            if self.status < 300
+            else web.Response(status=self.status, text="boom")
+        )
 
 
 @pytest.fixture
@@ -93,7 +97,7 @@ async def db():
 
 
 async def test_save_call_posts_one_idempotent_row(db):
-    assert await save_call(_loaded(), _record(), creds=(db.url, "sb_secret_x")) is True
+    assert await save_call(_loaded(), _record(), creds=(db.url, "sb_secret_x")) == "call-id-1"
     sent = db.posts[0]
     assert sent["query"] == {"on_conflict": "room,started_at"}
     assert "merge-duplicates" in sent["prefer"]
@@ -103,18 +107,18 @@ async def test_save_call_posts_one_idempotent_row(db):
 async def test_file_templates_and_missing_keys_are_not_saved(db):
     assert (
         await save_call(_loaded(agent_id=None, account_id=None), _record(), creds=(db.url, "k"))
-        is False
+        is None
     )
     assert db.posts == []
 
 
 async def test_a_database_error_returns_false_and_never_raises(db):
     db.status = 500
-    assert await save_call(_loaded(), _record(), creds=(db.url, "k")) is False
+    assert await save_call(_loaded(), _record(), creds=(db.url, "k")) is None
 
 
 async def test_an_unreachable_database_returns_false_and_never_raises():
     assert (
         await save_call(_loaded(), _record(), creds=("http://127.0.0.1:1", "k"), timeout_s=1)
-        is False
+        is None
     )

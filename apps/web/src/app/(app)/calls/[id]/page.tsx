@@ -38,9 +38,16 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
           <span className="chip">{call.source === "phone" ? "Phone" : "Test call"}</span>
           {call.goal_reached && <span className="chip chip-live">Successful</span>}
           {call.transferred && <span className="chip">Transferred{call.transfer_reason ? `: ${call.transfer_reason}` : ""}</span>}
+          {call.votel_synced_at && <span className="chip chip-live">In Votel CRM</span>}
           {call.recoveries > 0 && <span className="chip" title="The connection dropped briefly and the call continued.">Reconnected ×{call.recoveries}</span>}
         </p>
       </div>
+
+      {call.votel_error && (
+        <p role="note" className="rounded-lg border border-warn/40 bg-warn/10 p-3 text-sm">
+          We couldn&apos;t send this call to Votel. It is still saved here with its full transcript.
+        </p>
+      )}
 
       <section className="glass p-5" aria-label="Transcript">
         <h2 className="mb-3 text-sm font-medium">Transcript</h2>

@@ -21,6 +21,7 @@ KEYS = (
     "OPENAI_API_KEY",
     "SUPABASE_URL",
     "SUPABASE_SECRET_KEY",
+    "VOTEL_API_KEY",
 )
 
 
@@ -95,6 +96,15 @@ async def preflight(
                     json={"p_agent": "00000000-0000-0000-0000-000000000000"},
                 )
             )
+    from .votel import VotelError, list_tool_names, votel_config
+
+    cfg = votel_config() if env is os.environ else None
+    if cfg is not None:
+        try:
+            names = await list_tool_names(cfg)
+            lines.append(f"votel MCP ({cfg.mcp_url}): ok, {len(names)} tools")
+        except VotelError as e:
+            lines.append(f"votel MCP ({cfg.mcp_url}): FAILED {str(e)[:160]}")
     for line in lines:
         print(f"[preflight] {line}", flush=True)
     return lines
