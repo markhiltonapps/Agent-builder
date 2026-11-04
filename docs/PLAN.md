@@ -59,9 +59,13 @@ Two layers, built in this order:
   failures. This covers most real outages and is low risk.
 - **Mid-call recovery.** If the live session drops, rebuild it on the next provider and carry
   the transcript forward so the caller does not start over. LiveKit Agents 1.8 ships
-  `RealtimeModelFallbackAdapter`, which preserves chat context across swaps, but GPT-Live is a
-  `DuplexModel` with immutable instructions and chat context, so this needs a spike before it
-  is promised.
+  `RealtimeModelFallbackAdapter`, which seeds the new session with the conversation. Checked
+  on 1.8.10: OpenAI and Azure GPT-Live combine in it, but GPT-Live and Gemini do not
+  (`supports_overlapping_speech` differs), so a cross-family switch needs our own handoff via
+  `session.update_agent()`.
+- **Memory first.** The demo failure (agent came back with no memory, greeting again) is fixed
+  by keeping the conversation in our worker, saved per room, and never replaying the greeting
+  on recovery. Full design: the failover brief shared with the team.
 
 Requirements that come with it:
 
