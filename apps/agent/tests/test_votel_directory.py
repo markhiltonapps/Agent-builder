@@ -1,4 +1,4 @@
-"""The Voice Agents board in Votel, against a fake Votel that keeps state like the real one."""
+"""The Agent Builder OS board in Votel, against a fake Votel that keeps state like the real one."""
 
 import asyncio
 import socket

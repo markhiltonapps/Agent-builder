@@ -251,7 +251,7 @@ export async function startCall(agentId: string): Promise<CallResult> {
 
 export type SyncState = { message?: string; error?: string } | undefined;
 
-/** Send every agent in the person's workspace to Votel's "Voice Agents" board. */
+/** Send every agent in the person's workspace to Votel's "Agent Builder OS" board. */
 export async function syncAllToVotel(): Promise<SyncState> {
   const supabase = await supabaseServer();
   const { data: agents } = await supabase.from("agents").select("id");
@@ -265,6 +265,6 @@ export async function syncAllToVotel(): Promise<SyncState> {
   }
   if (sent === 0) return { error: `We couldn't send your agents to Votel. ${firstError ?? ""}`.trim() };
   return {
-    message: `Sent ${sent} agent${sent === 1 ? "" : "s"} to the Voice Agents board in Votel.` + (sent < agents.length ? ` ${agents.length - sent} didn't go through.` : ""),
+    message: `Sent ${sent} agent${sent === 1 ? "" : "s"} to the Agent Builder OS board in Votel.` + (sent < agents.length ? ` ${agents.length - sent} didn't go through.` : ""),
   };
 }

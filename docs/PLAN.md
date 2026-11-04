@@ -83,7 +83,7 @@ Requirements that come with it:
 Votel.ai stays the hub for CRM, websites and marketing; this builder is the voice engine
 under it. Decided with Mark:
 
-- **Directory, not copies.** A CMS collection in Votel ("Voice Agents") holds one row per agent:
+- **Directory, not copies.** A CMS collection in Votel ("Agent Builder OS") holds one row per agent:
   name, client, live version, fingerprint, link back to the builder. We do not mirror agents as
   Votel AI agents, because a copy would drift from what actually answers calls and could be
   switched on by mistake.

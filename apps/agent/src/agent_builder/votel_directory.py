@@ -1,4 +1,4 @@
-"""A directory of voice agents inside Votel: a "Voice Agents" task board, one card per agent.
+"""A directory of voice agents inside Votel: an "Agent Builder OS" task board, one card per agent.
 
 The card's column says whether the agent is live; its text says who it is for and links back
 to the builder. A task board suits this better than a website collection: it lives in Votel's
@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from .votel import UUID, VotelConfig, VotelError, call_tool, first_id
 
-PROJECT = "Voice Agents"
+PROJECT = "Agent Builder OS"
 TEMPLATE = "Voice agent status"
 NOT_LIVE, LIVE, RETIRED = "NOT LIVE", "LIVE", "RETIRED"
 STATUSES = [
@@ -67,7 +67,7 @@ def id_on_line_with(name: str, text: str) -> str | None:
 
 
 async def ensure_board(cfg: VotelConfig) -> None:
-    """Create the "Voice Agents" board (and its status template) if it is not there yet."""
+    """Create the "Agent Builder OS" board (and its status template) if it is not there yet."""
     if PROJECT.lower() in (await call_tool(cfg, "list_projects", {})).lower():
         return
     template_id = id_on_line_with(TEMPLATE, await call_tool(cfg, "list_status_templates", {}))

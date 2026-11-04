@@ -135,7 +135,7 @@ async def draft_revise(request: web.Request) -> web.Response:
 
 
 async def directory_sync(request: web.Request) -> web.Response:
-    """POST one agent's details -> create or update its card on Votel's "Voice Agents" board."""
+    """POST one agent's details -> create or update its card on Votel's "Agent Builder OS" board."""
     cfg = votel_config()
     if cfg is None:
         return web.json_response({"ok": False, "error": "Votel is not connected."}, status=503)

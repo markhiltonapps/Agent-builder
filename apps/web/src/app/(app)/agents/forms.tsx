@@ -94,7 +94,7 @@ export function CreateAgentForm({
   );
 }
 
-/** One click sends every agent to Votel's "Voice Agents" board. */
+/** One click sends every agent to Votel's "Agent Builder OS" board. */
 export function SyncVotelButton() {
   const [state, action, pending] = useActionState(syncAllToVotel, undefined);
   return (

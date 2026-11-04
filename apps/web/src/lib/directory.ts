@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { env } from "./env";
 
 /**
- * Send one agent's details to Votel's "Voice Agents" board (through the builder API).
+ * Send one agent's details to Votel's "Agent Builder OS" board (through the builder API).
  * Best effort: the callers never wait on this and never fail because of it.
  */
 export async function pushCard(supabase: SupabaseClient, agentId: string): Promise<{ ok: boolean; error?: string }> {
