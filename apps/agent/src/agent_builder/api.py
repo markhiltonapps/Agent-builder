@@ -14,6 +14,7 @@ Every /v1 call needs ``Authorization: Bearer $BUILDER_API_SECRET``.
 from __future__ import annotations
 
 import hmac
+import json
 import logging
 import os
 from typing import Any
@@ -23,6 +24,7 @@ from pydantic import ValidationError
 
 from .compiler import compile_agent
 from .config import AgentConfig
+from .draft import DraftError, draft
 
 log = logging.getLogger("agent_builder.api")
 
@@ -86,6 +88,50 @@ async def compile_(request: web.Request) -> web.Response:
     )
 
 
+async def _text(request: web.Request, key: str, limit: int) -> str:
+    try:
+        body = await request.json()
+    except ValueError:
+        raise web.HTTPBadRequest(
+            text='{"error": "body must be JSON"}', content_type="application/json"
+        ) from None
+    value = body.get(key) if isinstance(body, dict) else None
+    if not isinstance(value, str) or not value.strip():
+        raise web.HTTPBadRequest(
+            text=json.dumps({"error": f"{key} is required"}), content_type="application/json"
+        )
+    if len(value) > limit:
+        raise web.HTTPBadRequest(
+            text=json.dumps({"error": f"{key} is too long"}), content_type="application/json"
+        )
+    return value.strip()
+
+
+async def draft_new(request: web.Request) -> web.Response:
+    """POST {"description": "..."} -> {"ok": true, "config": {...}, "summary": "..."}"""
+    description = await _text(request, "description", 4000)
+    try:
+        d = await draft(description)
+    except DraftError as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=502)
+    return web.json_response({"ok": True, "config": d.config, "summary": d.summary})
+
+
+async def draft_revise(request: web.Request) -> web.Response:
+    """POST {"config": {...}, "instruction": "..."} -> {"ok": true, "config": {...}, "summary": "..."}"""
+    instruction = await _text(request, "instruction", 2000)
+    existing = await _read_config(request)
+    try:
+        current = AgentConfig.model_validate(existing).model_dump(mode="json")
+    except ValidationError as e:
+        return web.json_response({"ok": False, "errors": _errors(e)}, status=422)
+    try:
+        d = await draft(instruction, existing=current)
+    except DraftError as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=502)
+    return web.json_response({"ok": True, "config": d.config, "summary": d.summary})
+
+
 async def schema(_request: web.Request) -> web.Response:
     return web.json_response(AgentConfig.model_json_schema())
 
@@ -109,6 +155,8 @@ def make_app(secret: str) -> web.Application:
     app = web.Application(middlewares=[auth], client_max_size=MAX_BODY_BYTES)
     app.router.add_post("/v1/validate", validate)
     app.router.add_post("/v1/compile", compile_)
+    app.router.add_post("/v1/draft", draft_new)
+    app.router.add_post("/v1/revise", draft_revise)
     app.router.add_get("/v1/schema", schema)
     app.router.add_get("/healthz", healthz)
     return app
