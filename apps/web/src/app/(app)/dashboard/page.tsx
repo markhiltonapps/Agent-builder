@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { CountUp } from "@/components/count-up";
 import { LocalTime } from "@/components/local-time";
 import { TimeZoneCookie } from "@/components/time-zone-cookie";
 import { type DashboardStats, PERIODS, parseDays, percent, safeTimeZone, shortDay, spoken } from "@/lib/dashboard";
@@ -11,6 +12,9 @@ import { supabaseServer } from "@/lib/supabase/server";
 export const metadata: Metadata = { title: "Dashboard" };
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** Position in the build-in sequence: each step starts a little after the one before. */
+const step = (i: number) => ({ "--i": i }) as React.CSSProperties;
 
 export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   const sp = await searchParams;
@@ -38,7 +42,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   return (
     <section aria-labelledby="dash-h" className="mx-auto max-w-5xl space-y-6">
       <TimeZoneCookie current={tz} />
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="rise flex flex-wrap items-end justify-between gap-3" style={step(0)}>
         <div>
           <h1 id="dash-h" className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="mt-1 text-sm text-muted">{accounts[0].name}</p>
@@ -70,7 +74,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
       )}
 
       {s && s.totals.calls > 0 && s.agents.length > 0 && (
-        <section aria-labelledby="by-agent-h" className="space-y-3">
+        <section aria-labelledby="by-agent-h" className="rise space-y-3" style={step(8)}>
           <h2 id="by-agent-h" className="text-lg font-medium">By agent</h2>
           <div className="glass overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -102,7 +106,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
       )}
 
       {!!recent?.length && (
-        <section aria-labelledby="recent-h" className="space-y-3">
+        <section aria-labelledby="recent-h" className="rise space-y-3" style={step(9)}>
           <div className="flex items-baseline justify-between gap-2">
             <h2 id="recent-h" className="text-lg font-medium">Latest calls</h2>
             <Link href="/calls" className="link text-sm">See all calls</Link>
@@ -140,24 +144,24 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 function Numbers({ s }: { s: DashboardStats }) {
   const t = s.totals;
   const rate = percent(t.successful, t.calls);
-  const tiles: { label: string; value: string; note: string }[] = [
-    { label: "Calls", value: String(t.calls), note: `in the last ${s.days} days` },
+  const tiles: { label: string; value: React.ReactNode; note: string }[] = [
+    { label: "Calls", value: <CountUp to={t.calls} delayMs={250} />, note: `in the last ${s.days} days` },
     {
       label: "Reached their goal",
-      value: rate === null ? "-" : `${rate}%`,
+      value: rate === null ? "-" : <CountUp to={rate} kind="percent" delayMs={330} />,
       note: `${t.successful} of ${plural(t.calls, "call")}`,
     },
-    { label: "Handed to a person", value: String(t.transferred), note: t.transferred === 1 ? "call" : "calls" },
-    { label: "Average length", value: duration(t.avg_seconds), note: `${spoken(t.total_seconds)} in total` },
-    { label: "Messages taken", value: String(t.messages), note: t.messages === 1 ? "call left one" : "calls left one" },
-    { label: "Booking links sent", value: String(t.links), note: t.links === 1 ? "call" : "calls" },
+    { label: "Handed to a person", value: <CountUp to={t.transferred} delayMs={410} />, note: t.transferred === 1 ? "call" : "calls" },
+    { label: "Average length", value: <CountUp to={t.avg_seconds} kind="clock" delayMs={490} />, note: `${spoken(t.total_seconds)} in total` },
+    { label: "Messages taken", value: <CountUp to={t.messages} delayMs={570} />, note: t.messages === 1 ? "call left one" : "calls left one" },
+    { label: "Booking links sent", value: <CountUp to={t.links} delayMs={650} />, note: t.links === 1 ? "call" : "calls" },
   ];
   const peak = Math.max(1, ...s.series.map((d) => d.calls));
   return (
     <>
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        {tiles.map((x) => (
-          <div key={x.label} className="glass p-4">
+        {tiles.map((x, i) => (
+          <div key={x.label} className="glass rise p-4" style={step(i + 1)}>
             <dt className="text-sm text-muted">{x.label}</dt>
             <dd className="mt-1 text-3xl font-semibold tabular-nums tracking-tight">{x.value}</dd>
             <dd className="mt-1 text-xs text-faint">{x.note}</dd>
@@ -165,22 +169,22 @@ function Numbers({ s }: { s: DashboardStats }) {
         ))}
       </dl>
 
-      <section aria-labelledby="per-day-h" className="glass p-4">
+      <section aria-labelledby="per-day-h" className="glass rise p-4" style={step(7)}>
         <h2 id="per-day-h" className="text-lg font-medium">Calls per day</h2>
         <div
           className="mt-4 flex h-40 items-end gap-0.5 sm:gap-1"
           role="img"
           aria-label={`Bar chart of calls per day, ${shortDay(s.series[0].day)} to ${shortDay(s.series[s.series.length - 1].day)}. Busiest day had ${plural(peak, "call")}. The table below has every day.`}
         >
-          {s.series.map((d) => (
+          {s.series.map((d, i) => (
             <div
               key={d.day}
               className="flex h-full min-w-0 flex-1 items-end rounded-full bg-white/[0.07] p-px shadow-[inset_0_1px_3px_rgb(0_0_0/0.4)]"
               title={`${shortDay(d.day)}: ${plural(d.calls, "call")}`}
             >
               <div
-                className={`w-full rounded-full ${d.calls ? "bg-gradient-to-t from-[#3fc8b4] to-[#a6f7ea] shadow-[0_0_12px_-2px_rgb(110_231_211/0.55)]" : "bg-transparent"}`}
-                style={{ height: d.calls ? `${Math.max(6, (d.calls / peak) * 100)}%` : "0" }}
+                style={{ ...step(i), height: d.calls ? `${Math.max(6, (d.calls / peak) * 100)}%` : "0" }}
+                className={`grow-bar w-full rounded-full ${d.calls ? "bg-gradient-to-t from-[#3fc8b4] to-[#a6f7ea] shadow-[0_0_12px_-2px_rgb(110_231_211/0.55)]" : "bg-transparent"}`}
               />
             </div>
           ))}

@@ -64,6 +64,24 @@ body::before {
     radial-gradient(30rem 24rem at 50% 50%, rgb(99 102 241 / 0.14), transparent 70%);
   animation: aurora 48s ease-in-out infinite alternate;
 }
+/* Build-in motion for the dashboard: cards rise one after another, bars grow from the bottom. */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+.rise {
+  animation: rise 0.65s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+.grow-bar {
+  transform-origin: bottom;
+  animation: grow 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(0.55s + var(--i, 0) * 22ms);
+}
 @keyframes dialog-in {
   from { opacity: 0; transform: translateY(8px) scale(0.97); }
   to { opacity: 1; transform: none; }
