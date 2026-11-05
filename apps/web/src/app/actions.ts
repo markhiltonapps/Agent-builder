@@ -380,6 +380,17 @@ export async function openClient(form: FormData): Promise<void> {
   redirect(OPEN_TARGETS.test(to) ? to : "/dashboard");
 }
 
+/** Change a client's name (its owner only). */
+export async function renameClient(accountId: string, name: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const clean = name.replace(/\s+/g, " ").trim().slice(0, 200);
+  if (!clean) return { ok: false, error: "Enter a name for the client." };
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.from("accounts").update({ name: clean }).eq("id", accountId).select("id");
+  if (error || !data?.length) return { ok: false, error: "We couldn't rename that client. Only its owner can." };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 /** Add a client: a new workspace the person owns, which becomes the one they are working in. */
 export async function addClient(_: FormState, form: FormData): Promise<FormState> {
   const name = text(form, "name");

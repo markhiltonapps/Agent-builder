@@ -92,6 +92,7 @@ export default function HelpPage() {
           <li><B>All clients</B> is your home. The top bar shows <B>All clients</B>, <B>All calls</B>, <B>Usage and billing</B> and <B>Help</B>. Clicking <B>Neato Agent Builder</B> at the top left always brings you here.</li>
           <li><B>Inside a client</B> starts when you click a client&apos;s name or <B>Open</B>. A coloured bar under the top bar names the client, and holds everything about that client: <B>Dashboard</B>, <B>Agents</B>, <B>Knowledge</B>, <B>Calls</B>, <B>Phone numbers</B> and <B>Settings</B>.</li>
           <li>To go back up, click <B>◂ All clients</B> at the top left of the top bar.</li>
+          <li>To change a client&apos;s name (a typo, say), open the client, choose <B>Settings</B>, edit the <B>Client name</B> and choose <B>Save name</B>.</li>
         </Steps>
         <Shot name="around" height={620} alt="Inside a client: the coloured bar names Right Weight Scale and lists its Dashboard, Agents, Knowledge, Calls, Phone numbers and Settings, with All clients at the top left"
           caption="1: back to All clients. 2: which client you are in (and a menu to switch to another). 3: everything about that client." />

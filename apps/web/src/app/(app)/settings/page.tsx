@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { currentClient } from "@/lib/client";
 import { supabaseServer } from "@/lib/supabase/server";
-import { RemoveClient, ShareControl, VotelLink } from "../clients/client-forms";
+import { RemoveClient, RenameClient, ShareControl, VotelLink } from "../clients/client-forms";
 
 export const metadata: Metadata = { title: "Client settings" };
 
@@ -32,6 +32,10 @@ export default async function SettingsPage() {
       {owner ? (
         <>
           <div className="glass space-y-2 p-5">
+            <h2 className="font-medium">Name</h2>
+            <RenameClient key={current.name} accountId={current.id} name={current.name} />
+          </div>
+          <div className="glass space-y-2 p-5">
             <h2 className="font-medium">Votel</h2>
             <VotelLink accountId={current.id} linked={linked} />
           </div>
@@ -47,7 +51,7 @@ export default async function SettingsPage() {
           )}
         </>
       ) : (
-        <p className="glass p-5 text-sm text-muted">Only the owner of a client can change its Votel link, share its dashboard or remove it.</p>
+        <p className="glass p-5 text-sm text-muted">Only the owner of a client can rename it, change its Votel link, share its dashboard or remove it.</p>
       )}
     </section>
   );

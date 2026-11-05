@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useActionState, useId, useRef, useState, useTransition } from "react";
-import { addClient, addClientFromVotel, loadVotelClients, removeClient, removeVotelContact, sendClientToVotel, setClientShare, unlinkClientFromVotel, type VotelRemoval } from "@/app/actions";
+import { addClient, addClientFromVotel, loadVotelClients, removeClient, removeVotelContact, renameClient, sendClientToVotel, setClientShare, unlinkClientFromVotel, type VotelRemoval } from "@/app/actions";
 import type { VotelClient } from "@/lib/votel-clients";
 import { askConfirm } from "@/lib/dialog";
 
@@ -193,6 +193,36 @@ export function ShareControl({ accountId, initialToken, appUrl }: { accountId: s
       )}
       <p role="alert" className="text-sm text-danger empty:sr-only">{error ?? ""}</p>
     </div>
+  );
+}
+
+/** Change the client's name. */
+export function RenameClient({ accountId, name }: { accountId: string; name: string }) {
+  const router = useRouter();
+  const id = useId();
+  const [value, setValue] = useState(name);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const go = () =>
+    start(async () => {
+      setError(null);
+      setNotice(null);
+      const r = await renameClient(accountId, value);
+      if (!r.ok) return setError(r.error);
+      setNotice("Saved.");
+      router.refresh();
+    });
+  return (
+    <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); if (!pending) go(); }}>
+      <label className="label" htmlFor={id}>Client name</label>
+      <div className="flex flex-wrap gap-2">
+        <input id={id} className="field !w-auto min-w-64 flex-1" value={value} onChange={(e) => setValue(e.target.value)} maxLength={200} />
+        <button className="btn btn-primary" disabled={pending || value.trim() === name.trim() || !value.trim()}>{pending ? "Saving…" : "Save name"}</button>
+      </div>
+      <p role="alert" className="text-sm text-danger empty:sr-only">{error ?? ""}</p>
+      <p role="status" className="text-sm text-ok empty:sr-only">{notice ?? ""}</p>
+    </form>
   );
 }
 
