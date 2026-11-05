@@ -117,8 +117,9 @@ async def push_client(
 ) -> str:
     """Make sure this client has a tagged contact in Votel, and return its id.
 
-    An existing link is kept (and re-tagged if the tag was removed). A new one is created, or an
-    existing contact with the same email or phone is found and tagged; Votel does not duplicate.
+    An existing link is kept (and re-tagged if the tag was removed). Otherwise a tagged contact with
+    the same name is reused, or a new one is created (Votel itself finds a contact with the same
+    email or phone instead of duplicating it).
     """
     if contact_id:
         try:
@@ -126,6 +127,12 @@ async def push_client(
             return contact_id
         except VotelError:
             pass  # the contact was deleted in Votel: make a new one below
+    # No link yet. Votel only de-duplicates on email or phone, so a client without either (or one
+    # sent again after Unlink) would get a second contact: reuse a tagged one with the same name.
+    wanted = name.strip().casefold()
+    for known in await list_clients(cfg):
+        if known.name.casefold() == wanted:
+            return known.id
     fields: dict[str, object] = {"first_name": name[:120], "company": name[:200], "tags": [TAG]}
     if email and _EMAIL.match(email.strip()):
         fields["email"] = email.strip()

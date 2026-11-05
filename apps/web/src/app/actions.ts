@@ -419,7 +419,9 @@ export async function sendClientToVotel(accountId: string): Promise<ClientLinkRe
   const pushed = await pushVotelClient({ name: account.name, contactId: account.votel_contact_id });
   if (!pushed.ok) return pushed;
   const { error } = await supabase.rpc("link_client_votel", { p_account: accountId, p_contact: pushed.contactId });
-  if (error) return { ok: false, error: "Only the owner of a client can link it to Votel." };
+  if (error) {
+    return { ok: false, error: error.code === "23505" ? "That Votel contact is already linked to another client." : "Only the owner of a client can link it to Votel." };
+  }
   revalidatePath("/clients");
   return { ok: true, name: account.name };
 }

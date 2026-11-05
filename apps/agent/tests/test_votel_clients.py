@@ -97,17 +97,17 @@ async def test_a_new_client_becomes_a_tagged_contact_with_a_link_back(votel):
     )
     assert got == A
     names = [n for n, _ in v.calls]
-    assert names == ["create_contact", "add_contact_tags", "add_note"]
-    created = v.calls[0][1]
+    assert names == ["list_contacts", "create_contact", "add_contact_tags", "add_note"]
+    created = v.calls[1][1]
     assert created["company"] == "Acme Dental" and created["tags"] == ["agent-builder-client"]
     assert created["email"] == "front@acme.test" and created["phone"] == "+15125550100"
-    assert "https://bots.test/clients" in v.calls[2][1]["note"]
+    assert "https://bots.test/clients" in v.calls[3][1]["note"]
 
 
 async def test_a_bad_email_or_phone_is_left_out_not_sent(votel):
     v = votel(create_contact=f"created ID: {A}", add_contact_tags="ok")
     await vc.push_client(CFG, name="Acme", email="not-an-email", phone="12")
-    assert set(v.calls[0][1]) == {"first_name", "company", "tags"}
+    assert set(v.calls[1][1]) == {"first_name", "company", "tags"}
 
 
 async def test_an_existing_link_is_kept_and_retagged(votel):
@@ -124,7 +124,7 @@ async def test_a_contact_deleted_in_votel_is_replaced(votel):
         create_contact=f"created ID: {A}",
     )
     assert await vc.push_client(CFG, name="Acme", contact_id=B) == A
-    assert [n for n, _ in v.calls][:2] == ["add_contact_tags", "create_contact"]
+    assert [n for n, _ in v.calls][:3] == ["add_contact_tags", "list_contacts", "create_contact"]
 
 
 async def test_votel_giving_no_id_is_an_error(votel):
@@ -140,3 +140,10 @@ async def test_a_call_note_never_raises(votel):
     v2 = votel(add_note="ok")
     await vc.note_call(CFG, A, agent="Front desk", outcome="Booked.", link="https://x/calls/1")
     assert "Booked." in v2.calls[0][1]["note"] and "https://x/calls/1" in v2.calls[0][1]["note"]
+
+
+async def test_sending_a_client_again_reuses_its_tagged_contact(votel):
+    """Unlink then Send again must not leave a second contact behind in Votel."""
+    v = votel(list_contacts=LISTING)
+    assert await vc.push_client(CFG, name="  zz test client co ") == A
+    assert [n for n, _ in v.calls] == ["list_contacts"]  # nothing created, nothing to tag again
