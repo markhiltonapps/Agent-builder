@@ -33,6 +33,8 @@ class AgentCard:
     live_version: int | None
     app_url: str
     retired: bool = False
+    client_contact_id: str | None = None
+    """The client's own Votel contact; the card is attached to it when the card is first made."""
 
     @property
     def status(self) -> str:
@@ -134,7 +136,16 @@ async def sync_agent(cfg: VotelConfig, card: AgentCard, task_id: str | None = No
         await call_tool(cfg, "update_task", {"task_id": task_id, **fields})
         return Synced("updated", task_id)
     made = first_id(
-        await call_tool(cfg, "create_task", {**fields, "project": PROJECT, "tags": ["voice-agent"]})
+        await call_tool(
+            cfg,
+            "create_task",
+            {
+                **fields,
+                "project": PROJECT,
+                "tags": ["voice-agent"],
+                **({"lead_id": card.client_contact_id} if card.client_contact_id else {}),
+            },
+        )
     )
     if not made:
         raise_missing("the new card")

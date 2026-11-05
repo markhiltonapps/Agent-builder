@@ -10,6 +10,7 @@ import { MAX_SITES, parseSites } from "@/lib/embed-code";
 import { forgetEmbedInfo } from "@/lib/embed-info";
 import { logoKind, logoProblem } from "@/lib/embed-logo";
 import { importVotelAgent, listVotelBookables, type VotelBookable } from "@/lib/votel-import";
+import { getVotelClient, listVotelClients, pushVotelClient, type VotelClient } from "@/lib/votel-clients";
 import { callToken } from "@/lib/livekit";
 import type { Compiled, ValidationIssue } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -365,8 +366,71 @@ export async function addClient(_: FormState, form: FormData): Promise<FormState
   const supabase = await supabaseServer();
   const { data, error } = await supabase.rpc("create_account", { p_name: name.slice(0, 200) });
   if (error || !data) return { error: "We couldn't add the client. Try again." };
-  await rememberClient((data as { id: string }).id);
+  const id = (data as { id: string }).id;
+  // Also make (or find) the client's contact in Votel, tagged agent-builder-client. Best effort:
+  // if Votel can't be reached the client is still added, and "Send to Votel" can be used later.
+  if (form.get("to_votel")) {
+    const pushed = await pushVotelClient({ name, email: text(form, "email"), phone: text(form, "phone") });
+    if (pushed.ok) await supabase.rpc("link_client_votel", { p_account: id, p_contact: pushed.contactId });
+  }
+  await rememberClient(id);
   redirect("/clients");
+}
+
+export type VotelClientsResult = { ok: true; clients: VotelClient[]; tag: string } | { ok: false; error: string };
+
+/** The Votel contacts tagged as clients that aren't clients here yet. */
+export async function loadVotelClients(): Promise<VotelClientsResult> {
+  const supabase = await supabaseServer();
+  const { data } = await supabase.auth.getClaims();
+  if (!data?.claims) return { ok: false, error: "Your session ended. Sign in again to continue." };
+  const found = await listVotelClients();
+  if (!found.ok) return found;
+  const { data: linked } = await supabase.from("accounts").select("votel_contact_id").not("votel_contact_id", "is", null);
+  const taken = new Set((linked ?? []).map((a) => String(a.votel_contact_id).toLowerCase()));
+  return { ok: true, tag: found.tag, clients: found.clients.filter((c) => !taken.has(c.id.toLowerCase())) };
+}
+
+export type ClientLinkResult = { ok: true; name: string } | { ok: false; error: string };
+
+/** Make a Votel contact (one with the client tag) a client here, with a workspace of its own. */
+export async function addClientFromVotel(contactId: string): Promise<ClientLinkResult> {
+  const supabase = await supabaseServer();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims) return { ok: false, error: "Your session ended. Sign in again to continue." };
+  const got = await getVotelClient(contactId);
+  if (!got.ok) return got;
+  const { data: dup } = await supabase.from("accounts").select("id").eq("votel_contact_id", got.client.id).maybeSingle();
+  if (dup) return { ok: false, error: `${got.client.name} is already a client here.` };
+  const { data, error } = await supabase.rpc("create_account", { p_name: got.client.name.slice(0, 200) });
+  if (error || !data) return { ok: false, error: "We couldn't add the client. Try again." };
+  const id = (data as { id: string }).id;
+  const { error: linkError } = await supabase.rpc("link_client_votel", { p_account: id, p_contact: got.client.id });
+  if (linkError) return { ok: false, error: "The client was added but couldn't be linked to Votel. Use Send to Votel on its card." };
+  revalidatePath("/clients");
+  return { ok: true, name: got.client.name };
+}
+
+/** Create (or find) this client's contact in Votel, tag it, and remember the link. */
+export async function sendClientToVotel(accountId: string): Promise<ClientLinkResult> {
+  const supabase = await supabaseServer();
+  const { data: account } = await supabase.from("accounts").select("name, votel_contact_id").eq("id", accountId).maybeSingle();
+  if (!account) return { ok: false, error: "We couldn't find that client." };
+  const pushed = await pushVotelClient({ name: account.name, contactId: account.votel_contact_id });
+  if (!pushed.ok) return pushed;
+  const { error } = await supabase.rpc("link_client_votel", { p_account: accountId, p_contact: pushed.contactId });
+  if (error) return { ok: false, error: "Only the owner of a client can link it to Votel." };
+  revalidatePath("/clients");
+  return { ok: true, name: account.name };
+}
+
+/** Stop linking this client to its Votel contact. The contact itself is left alone in Votel. */
+export async function unlinkClientFromVotel(accountId: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await supabaseServer();
+  const { error } = await supabase.rpc("link_client_votel", { p_account: accountId, p_contact: null });
+  if (error) return { ok: false, error: "Only the owner of a client can change this." };
+  revalidatePath("/clients");
+  return { ok: true };
 }
 
 export type ShareResult = { ok: true; token: string | null } | { ok: false; error: string };

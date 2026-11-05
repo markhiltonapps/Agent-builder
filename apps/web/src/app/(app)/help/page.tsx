@@ -87,6 +87,18 @@ export default function HelpPage() {
         </P>
         <Shot name="clients" height={800} alt="The Clients page with two client cards, a client switcher in the top bar and a dashboard link"
           caption="1: switch client here. 2: open a client. 3: its private dashboard link (see Share with a client)." />
+        <P>
+          Clients and Votel stay in step, in both directions, through one tag: <B>agent-builder-client</B>.
+        </P>
+        <Steps>
+          <li><B>From Votel to here:</B> in Votel, open a contact and give it the tag <B>agent-builder-client</B>. Back here, choose <B>Check Votel for clients</B> (under <B>Add from Votel</B>) and then <B>Add as client</B>. It becomes a client with its own empty workspace. If the contact has a company name, that is the client&apos;s name.</li>
+          <li><B>From here to Votel:</B> when you add a client, leave <B>Also add this client to Votel</B> ticked. A contact is created in Votel with the tag, or the existing one with the same email or phone is found and tagged. For a client you already had, choose <B>Send to Votel</B> on its card.</li>
+          <li><B>What follows:</B> each client card shows <B>Linked to a Votel contact</B>. After that, a one-line note is added to that contact whenever one of the client&apos;s agents takes a call, and new agent cards on the Agent Builder OS board are attached to it.</li>
+        </Steps>
+        <Tip>
+          Nothing is ever deleted in Votel from here. <B>Unlink</B> on a card only stops the matching: the client stays here and the contact stays in Votel.
+          A Votel contact can belong to one client only.
+        </Tip>
 
         <H id="pick">Pick a ready-made agent</H>
         <P>
@@ -246,6 +258,7 @@ export default function HelpPage() {
             Each agent here has a card that shows whether it&apos;s live. In the Agents page, choose <B>Send agents to Votel</B>{" "}
             to refresh it. (Votel&apos;s own <B>Agents</B> page lists the agents built inside Votel, not these.)
           </li>
+          <li><B>Your clients</B>: in <B>Contacts</B>, the ones tagged <B>agent-builder-client</B>. Each one has a note for every call its agents take, and its agents&apos; cards on the board are attached to it.</li>
           <li><B>Callers</B>: in <B>Contacts</B>. Each caller who left details has a note with the call summary and a link back to the transcript here.</li>
           <li><B>Follow-ups</B>: in <B>Tasks</B>. Urgent calls and callback requests appear as tasks.</li>
           <li><B>Appointment requests</B>: in <B>Calendars</B>, as pending bookings.</li>

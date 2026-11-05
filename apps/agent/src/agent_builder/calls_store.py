@@ -150,3 +150,28 @@ async def mark_synced(
                 log.error("marking the call synced failed: HTTP %s", r.status)
     except (aiohttp.ClientError, TimeoutError):
         log.exception("marking the call synced failed")
+
+
+async def account_contact(
+    account_id: str, *, creds: tuple[str, str] | None = None, timeout_s: float = 8.0
+) -> str | None:
+    """The Votel contact this client (workspace) is linked to, if any. Never raises."""
+    creds = creds or supabase.credentials()
+    if creds is None:
+        return None
+    url, key = creds
+    try:
+        async with (
+            aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout_s)) as http,
+            http.get(
+                f"{url.rstrip('/')}/rest/v1/accounts",
+                params={"id": f"eq.{account_id}", "select": "votel_contact_id"},
+                headers=supabase.headers(key),
+            ) as r,
+        ):
+            if r.status >= 300:
+                return None
+            rows = await r.json()
+    except (aiohttp.ClientError, TimeoutError, ValueError):
+        return None
+    return (rows[0].get("votel_contact_id") or None) if rows else None

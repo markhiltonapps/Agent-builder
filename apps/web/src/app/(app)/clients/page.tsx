@@ -5,7 +5,7 @@ import { LocalTime } from "@/components/local-time";
 import { currentClient } from "@/lib/client";
 import { type DashboardStats } from "@/lib/dashboard";
 import { supabaseServer } from "@/lib/supabase/server";
-import { AddClientForm, ShareControl } from "./client-forms";
+import { AddClientForm, ShareControl, VotelLink, VotelPicker } from "./client-forms";
 
 export const metadata: Metadata = { title: "Clients" };
 
@@ -19,11 +19,12 @@ export default async function ClientsPage() {
   const [{ data: members }, { data: agents }, { data: tokens }, ...stats] = await Promise.all([
     supabase.from("account_members").select("account_id, role"),
     supabase.from("agents").select("account_id, published_version_id"),
-    supabase.from("accounts").select("id, share_token"),
+    supabase.from("accounts").select("id, share_token, votel_contact_id"),
     ...clients.map((c) => supabase.rpc("dashboard_stats", { p_days: 30, p_account: c.id })),
   ]);
   const role = new Map((members ?? []).map((m) => [m.account_id as string, m.role as string]));
   const token = new Map((tokens ?? []).map((t) => [t.id as string, (t.share_token as string | null) ?? null]));
+  const linked = new Set((tokens ?? []).filter((t) => t.votel_contact_id).map((t) => t.id as string));
 
   return (
     <section aria-labelledby="clients-h" className="mx-auto max-w-5xl space-y-5">
@@ -57,7 +58,10 @@ export default async function ClientsPage() {
                 <button className="btn btn-primary">Open this client</button>
               </form>
               {owner ? (
-                <ShareControl accountId={c.id} initialToken={token.get(c.id) ?? null} appUrl={appUrl} />
+                <>
+                  <VotelLink accountId={c.id} linked={linked.has(c.id)} />
+                  <ShareControl accountId={c.id} initialToken={token.get(c.id) ?? null} appUrl={appUrl} />
+                </>
               ) : (
                 <p className="text-xs text-faint">Only the owner of a client can share its dashboard.</p>
               )}
@@ -66,11 +70,20 @@ export default async function ClientsPage() {
         })}
       </ul>
 
-      <aside className="glass max-w-xl p-5" aria-labelledby="add-h">
-        <h2 id="add-h" className="mb-1 font-medium">Add a client</h2>
-        <p className="mb-4 text-sm text-muted">A new, empty workspace for another business. You&apos;ll be its owner.</p>
-        <AddClientForm />
-      </aside>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <aside className="glass p-5" aria-labelledby="add-h">
+          <h2 id="add-h" className="mb-1 font-medium">Add a client</h2>
+          <p className="mb-4 text-sm text-muted">A new, empty workspace for another business. You&apos;ll be its owner.</p>
+          <AddClientForm />
+        </aside>
+        <aside className="glass p-5" aria-labelledby="votel-h">
+          <h2 id="votel-h" className="mb-1 font-medium">Add from Votel</h2>
+          <p className="mb-4 text-sm text-muted">
+            In Votel, give a contact the tag <code>agent-builder-client</code>. Then check here and add it as a client.
+          </p>
+          <VotelPicker />
+        </aside>
+      </div>
       <p className="text-xs text-faint">Last updated <LocalTime iso={new Date().toISOString()} />.</p>
     </section>
   );

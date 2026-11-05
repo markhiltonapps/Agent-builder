@@ -34,7 +34,7 @@ from livekit.agents import (
 from livekit.agents.beta.tools import EndCallTool
 
 from .adapters import restore_adapters, snapshot_adapters
-from .calls_store import mark_synced, save_call, source_for, transcript_lines
+from .calls_store import account_contact, mark_synced, save_call, source_for, transcript_lines
 from .compiler import CompiledAgent, compile_agent
 from .loader import ROOT, resolve_config
 from .preflight import run as run_preflight
@@ -43,6 +43,7 @@ from .session_store import ConversationStore, SavedCall, Saver, store_from_env
 from .summary import summarize
 from .tools import CallRecorder, build_tools
 from .votel import votel_config
+from .votel_clients import note_call
 from .votel_sync import sync_call
 
 load_dotenv(ROOT / ".env")
@@ -149,6 +150,26 @@ def sip_caller(room: rtc.Room) -> str | None:
     return None
 
 
+async def note_on_client(cfg, loaded, record: dict, call_id: str) -> None:
+    """A one-line note on the client's own Votel contact, when this client is linked to one."""
+    try:
+        contact = await account_contact(loaded.account_id) if loaded.account_id else None
+        if not contact:
+            return
+        base = (os.getenv("APP_URL") or "").rstrip("/")
+        summary = " ".join(str(record.get("summary") or "").split())[:240]
+        outcome = "Handed off to a person." if record.get("transferred") else summary
+        await note_call(
+            cfg,
+            contact,
+            agent=loaded.config.persona.agent_name,
+            outcome=outcome,
+            link=f"{base}/calls/{call_id}" if base else "",
+        )
+    except Exception:
+        log.exception("noting the call on the client failed")
+
+
 async def after_call(loaded, record: dict) -> None:
     """Everything that happens once a call is over. Each step is best effort: the call is
     already recorded in the JSON file, and nothing here may raise."""
@@ -172,6 +193,7 @@ async def after_call(loaded, record: dict) -> None:
         if result.skipped:
             log.info("not sent to Votel: %s", result.skipped)
         else:
+            await note_on_client(cfg, loaded, record, call_id)
             await mark_synced(call_id, contact_id=result.contact_id, error=result.error)
             log.info(
                 "sent to Votel" if result.error is None else "Votel sync failed: %s", result.error

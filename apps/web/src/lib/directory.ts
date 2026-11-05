@@ -16,7 +16,7 @@ export async function pushCard(supabase: SupabaseClient, agentId: string): Promi
     if (!agent) return { ok: false, error: "That agent was not found." };
 
     const [{ data: account }, { data: live }, { data: latest }] = await Promise.all([
-      supabase.from("accounts").select("name").eq("id", agent.account_id).maybeSingle(),
+      supabase.from("accounts").select("name, votel_contact_id").eq("id", agent.account_id).maybeSingle(),
       agent.published_version_id
         ? supabase.from("agent_versions").select("version, config").eq("id", agent.published_version_id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -42,6 +42,7 @@ export async function pushCard(supabase: SupabaseClient, agentId: string): Promi
         live_version: live?.version ?? null,
         app_url: process.env.APP_URL ?? "",
         task_id: agent.votel_task_id ?? undefined,
+        client_contact_id: account?.votel_contact_id ?? undefined,
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(60_000),

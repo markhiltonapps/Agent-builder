@@ -123,3 +123,33 @@ async def test_an_unreachable_database_returns_false_and_never_raises():
         await save_call(_loaded(), _record(), creds=("http://127.0.0.1:1", "k"), timeout_s=1)
         is None
     )
+
+
+async def test_the_clients_votel_contact_is_looked_up_by_workspace():
+    from agent_builder.calls_store import account_contact
+
+    seen: list[dict] = []
+    rows: list[dict] = [{"votel_contact_id": "b9a2fcdc-b9af-4c7e-a526-ae2e5767c93e"}]
+
+    async def get(request: web.Request) -> web.Response:
+        seen.append(dict(request.query))
+        return web.json_response(rows)
+
+    app = web.Application()
+    app.router.add_get("/rest/v1/accounts", get)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    creds = (f"http://127.0.0.1:{site._server.sockets[0].getsockname()[1]}", "sb_secret_x")
+    try:
+        assert await account_contact(ACCOUNT, creds=creds) == rows[0]["votel_contact_id"]
+        assert seen[0] == {"id": f"eq.{ACCOUNT}", "select": "votel_contact_id"}
+        rows[:] = [{"votel_contact_id": None}]  # a client that isn't linked
+        assert await account_contact(ACCOUNT, creds=creds) is None
+        rows[:] = []  # an unknown workspace
+        assert await account_contact(ACCOUNT, creds=creds) is None
+    finally:
+        await runner.cleanup()
+    # a database that can't be reached never raises into the call
+    assert await account_contact(ACCOUNT, creds=("http://127.0.0.1:1", "k"), timeout_s=1) is None

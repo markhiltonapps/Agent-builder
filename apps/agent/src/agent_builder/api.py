@@ -22,7 +22,7 @@ from typing import Any
 from aiohttp import web
 from pydantic import ValidationError
 
-from . import embed, votel_import
+from . import embed, votel_clients, votel_import
 from .compiler import compile_agent
 from .config import AgentConfig
 from .draft import DraftError, draft
@@ -151,6 +151,9 @@ async def directory_sync(request: web.Request) -> web.Response:
             live_version=body.get("live_version"),
             app_url=str(body["app_url"]),
             retired=bool(body.get("retired")),
+            client_contact_id=str(body["client_contact_id"])
+            if body.get("client_contact_id")
+            else None,
         )
     except (ValueError, KeyError, TypeError):
         raise web.HTTPBadRequest(
@@ -235,6 +238,64 @@ async def votel_import_agent(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "name": name, "config": d.config, "summary": d.summary})
 
 
+async def votel_clients_list(_request: web.Request) -> web.Response:
+    """GET -> the Votel contacts tagged as clients, for the "Add from Votel" picker."""
+    cfg = votel_config()
+    if cfg is None:
+        return web.json_response({"ok": False, "error": "Votel is not connected."}, status=503)
+    try:
+        found = await votel_clients.list_clients(cfg)
+    except VotelError as e:
+        return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
+    return web.json_response(
+        {"ok": True, "tag": votel_clients.TAG, "clients": [c.to_json() for c in found]}
+    )
+
+
+async def votel_client_get(request: web.Request) -> web.Response:
+    """POST {"contact_id"} -> {"ok": true, "client": {id, name, email, phone}} for a tagged contact."""
+    cfg = votel_config()
+    if cfg is None:
+        return web.json_response({"ok": False, "error": "Votel is not connected."}, status=503)
+    contact_id = (await _text(request, "contact_id", 64)).strip()
+    try:
+        client = await votel_clients.fetch_client(cfg, contact_id)
+    except VotelError as e:
+        return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
+    return web.json_response({"ok": True, "client": client.to_json()})
+
+
+async def votel_client_push(request: web.Request) -> web.Response:
+    """POST {"name", "email"?, "phone"?, "contact_id"?, "app_url"?} -> {"ok": true, "contact_id"}.
+
+    Makes sure the client has a tagged contact in Votel, creating one if needed.
+    """
+    cfg = votel_config()
+    if cfg is None:
+        return web.json_response({"ok": False, "error": "Votel is not connected."}, status=503)
+    try:
+        body = await request.json()
+        name = str(body["name"]).strip()
+        if not name:
+            raise ValueError
+    except (ValueError, KeyError, TypeError):
+        raise web.HTTPBadRequest(
+            text='{"error": "name is required"}', content_type="application/json"
+        ) from None
+    try:
+        contact_id = await votel_clients.push_client(
+            cfg,
+            name=name,
+            email=str(body.get("email") or "") or None,
+            phone=str(body.get("phone") or "") or None,
+            contact_id=str(body["contact_id"]) if body.get("contact_id") else None,
+            app_url=str(body.get("app_url") or "") or None,
+        )
+    except VotelError as e:
+        return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
+    return web.json_response({"ok": True, "contact_id": contact_id})
+
+
 async def schema(_request: web.Request) -> web.Response:
     return web.json_response(AgentConfig.model_json_schema())
 
@@ -266,6 +327,9 @@ def make_app(secret: str) -> web.Application:
     app.router.add_get("/v1/votel/agents", votel_agents)
     app.router.add_get("/v1/votel/bookables", votel_bookables)
     app.router.add_post("/v1/votel/import", votel_import_agent)
+    app.router.add_get("/v1/votel/clients", votel_clients_list)
+    app.router.add_post("/v1/votel/client", votel_client_get)
+    app.router.add_post("/v1/votel/client-push", votel_client_push)
     app.router.add_get("/v1/schema", schema)
     app.router.add_get("/healthz", healthz)
     return app
