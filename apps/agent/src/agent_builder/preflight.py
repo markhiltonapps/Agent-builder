@@ -64,7 +64,10 @@ async def _status(http: aiohttp.ClientSession, method: str, url: str, **kw: obje
 
 
 async def preflight(
-    env: dict[str, str] | None = None, *, openai_base: str | None = None
+    env: dict[str, str] | None = None,
+    *,
+    openai_base: str | None = None,
+    google_base: str | None = None,
 ) -> list[str]:
     """Check the keys against their services. Returns report lines (also printed)."""
     env = os.environ if env is None else env
@@ -82,6 +85,17 @@ async def preflight(
             f"openai model {model} (GET /models/{model}): "
             f"{await _status(http, 'GET', f'{base}/models/{model}', headers=auth)}"
         )
+        gkey = (env.get("GEMINI_API_KEY") or env.get("GOOGLE_API_KEY") or "").strip()
+        if gkey:
+            from .config import GOOGLE_MODEL
+
+            gbase = (google_base or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
+            lines.append(
+                f"gemini model {GOOGLE_MODEL} (GET /models/{GOOGLE_MODEL}): "
+                f"{await _status(http, 'GET', f'{gbase}/models/{GOOGLE_MODEL}', headers={'x-goog-api-key': gkey})}"
+            )
+        else:
+            lines.append("gemini backup voice: no key set (failover is off)")
         url, sk = env.get("SUPABASE_URL", ""), env.get("SUPABASE_SECRET_KEY", "")
         if url and sk:
             h = {"apikey": sk, "Content-Type": "application/json"}
