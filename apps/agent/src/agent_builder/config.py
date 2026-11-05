@@ -165,6 +165,24 @@ class BookingLink(_Strict):
         return v
 
 
+class CalendarBooking(_Strict):
+    """Let the agent request appointments on a Votel booking service's calendar.
+
+    A request is saved as pending: the team confirms it, so the agent never tells a caller that
+    something is booked.
+    """
+
+    service_id: Annotated[
+        str,
+        Field(
+            pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        ),
+    ]
+    """The Votel booking service (a "bookable") the appointment is requested on."""
+    service_name: ShortText
+    duration_minutes: Annotated[int, Field(ge=5, le=480)] = 60
+
+
 class AgentConfig(_Strict):
     schema_version: Literal[1] = SCHEMA_VERSION
     persona: Persona
@@ -176,6 +194,7 @@ class AgentConfig(_Strict):
     adapters: dict[ToolName, AdapterConfig] = Field(default_factory=dict)
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
     booking: BookingLink | None = None
+    calendar: CalendarBooking | None = None
 
     @model_validator(mode="after")
     def _tools_bind_to_known_adapters(self) -> AgentConfig:
@@ -183,9 +202,13 @@ class AgentConfig(_Strict):
         dupes = {n for n in names if names.count(n) > 1}
         if dupes:
             raise ValueError(f"duplicate tool name(s): {', '.join(sorted(dupes))}")
-        reserved = {"end_call", "transfer_to_human", "take_message", "send_booking_link"} & set(
-            names
-        )
+        reserved = {
+            "end_call",
+            "transfer_to_human",
+            "take_message",
+            "send_booking_link",
+            "request_appointment",
+        } & set(names)
         if reserved:
             raise ValueError(f"reserved built-in tool name(s): {', '.join(sorted(reserved))}")
         missing = {t.adapter for t in self.tools} - set(self.adapters)

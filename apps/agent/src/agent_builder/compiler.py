@@ -135,6 +135,12 @@ def compile_agent(cfg: AgentConfig, now: datetime | None = None) -> CompiledAgen
             f"Send the caller a link by {how} so they can book an appointment online "
             "themselves. Offer it when they want to schedule something."
         )
+    if cfg.calendar:
+        abilities.append(
+            f'Request an appointment for "{cfg.calendar.service_name}" on the team\'s calendar, for '
+            "the day and time the caller prefers. It is only a request: the team confirms it. Never "
+            "say it is booked or confirmed."
+        )
     capabilities = "\n".join(f"- {a}" for a in abilities)
     if capabilities:
         capabilities = (

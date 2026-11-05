@@ -202,6 +202,18 @@ async def votel_agents(_request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "agents": [a.to_json() for a in agents]})
 
 
+async def votel_bookables(_request: web.Request) -> web.Response:
+    """GET -> the booking services in the connected Votel account, for the calendar setting."""
+    cfg = votel_config()
+    if cfg is None:
+        return web.json_response({"ok": False, "error": "Votel is not connected."}, status=503)
+    try:
+        found = await votel_import.list_bookables(cfg)
+    except VotelError as e:
+        return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
+    return web.json_response({"ok": True, "bookables": [b.to_json() for b in found]})
+
+
 async def votel_import_agent(request: web.Request) -> web.Response:
     """POST {"agent_id"} -> {"ok": true, "name", "config", "summary"}: a draft made from a Votel agent."""
     cfg = votel_config()
@@ -252,6 +264,7 @@ def make_app(secret: str) -> web.Application:
     app.router.add_get("/v1/embed/info", embed_info)
     app.router.add_post("/v1/embed/begin", embed_begin)
     app.router.add_get("/v1/votel/agents", votel_agents)
+    app.router.add_get("/v1/votel/bookables", votel_bookables)
     app.router.add_post("/v1/votel/import", votel_import_agent)
     app.router.add_get("/v1/schema", schema)
     app.router.add_get("/healthz", healthz)

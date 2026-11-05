@@ -8,7 +8,7 @@ import { compileConfig, draftConfig, reviseConfig } from "@/lib/builder-api";
 import { pushCard } from "@/lib/directory";
 import { MAX_SITES, parseSites } from "@/lib/embed-code";
 import { forgetEmbedInfo } from "@/lib/embed-info";
-import { importVotelAgent } from "@/lib/votel-import";
+import { importVotelAgent, listVotelBookables, type VotelBookable } from "@/lib/votel-import";
 import { callToken } from "@/lib/livekit";
 import type { Compiled, ValidationIssue } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -358,4 +358,12 @@ export async function setClientShare(accountId: string, enabled: boolean, rotate
   if (error) return { ok: false, error: "Only the owner of a client can change its dashboard link." };
   revalidatePath("/clients");
   return { ok: true, token: (data as string | null) ?? null };
+}
+
+/** The Votel booking services an agent's appointment requests can go to. Signed-in people only. */
+export async function loadBookables(): Promise<{ ok: true; bookables: VotelBookable[] } | { ok: false; error: string }> {
+  const supabase = await supabaseServer();
+  const { data } = await supabase.auth.getClaims();
+  if (!data?.claims) return { ok: false, error: "Your session ended. Sign in again to continue." };
+  return listVotelBookables();
 }

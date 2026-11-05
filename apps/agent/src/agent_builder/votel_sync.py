@@ -46,9 +46,19 @@ def normalize_phone(raw: str | None) -> str | None:
 
 def _message(record: dict[str, Any]) -> dict[str, str] | None:
     for call in reversed(record.get("tool_calls", [])):
-        if call.get("tool") == "take_message" and call.get("ok"):
-            return {k: str(v) for k, v in call.get("args", {}).items()}
+        if call.get("tool") in ("take_message", "request_appointment") and call.get("ok"):
+            msg = {k: str(v) for k, v in call.get("args", {}).items()}
+            if call["tool"] == "request_appointment":
+                msg.setdefault("request_type", "appointment")
+            return msg
     return None
+
+
+def _requested_appointment(record: dict[str, Any]) -> bool:
+    """The agent already put the appointment on the team's calendar during the call."""
+    return any(
+        c.get("tool") == "request_appointment" and c.get("ok") for c in record.get("tool_calls", [])
+    )
 
 
 def _who(msg: dict[str, str] | None) -> str:
@@ -85,6 +95,8 @@ def note_text(
     outcome = (
         "transferred to a person"
         if record.get("transferred")
+        else "appointment requested on the calendar"
+        if _requested_appointment(record)
         else "message taken"
         if msg
         else "completed its goal"
@@ -156,7 +168,8 @@ async def sync_call(
                 "note": body,
             },
         )
-        if msg or record.get("transferred"):
+        # An appointment already on the calendar needs no extra "book it" task.
+        if (msg and not _requested_appointment(record)) or record.get("transferred"):
             who = name or phone
             reason = (
                 (msg or {}).get("reason") or record.get("transfer_reason") or "see the call note"

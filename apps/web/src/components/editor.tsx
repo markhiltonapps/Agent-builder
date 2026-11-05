@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import {
-  askAiToChange, duplicateAgent, previewConfig, publishVersion, saveVersion, type PreviewResult,
+  askAiToChange, duplicateAgent, loadBookables, previewConfig, publishVersion, saveVersion, type PreviewResult,
 } from "@/app/actions";
 import type { AgentConfig, ValidationIssue } from "@/lib/config";
 import { diffJson, type Json } from "@/lib/diff";
@@ -41,7 +41,7 @@ const sectionOf = (path: string): SectionKey => {
   if (head === "greetings") return "greetings";
   if (head === "guardrails") return "rules";
   if (head === "escalation") return "handoffs";
-  if (head === "tools" || head === "adapters" || head === "booking") return "actions";
+  if (head === "tools" || head === "adapters" || head === "booking" || head === "calendar") return "actions";
   if (head === "policy") return "flows";
   if (head === "runtime") return "voice";
   return "advanced";
@@ -421,6 +421,7 @@ function ActionsSection({ config, set, issues }: SectionProps) {
         })}
       </ul>
       <BookingCard config={config} set={set} issues={issues} />
+      <CalendarCard config={config} set={set} issues={issues} />
       {adapterNames.length > 0 && (
         <fieldset className="space-y-3">
           <legend className="label">Connections</legend>
@@ -433,6 +434,73 @@ function ActionsSection({ config, set, issues }: SectionProps) {
         </fieldset>
       )}
     </>
+  );
+}
+
+/** Where the agent puts appointment requests: one of the Votel booking services. */
+function CalendarCard({ config, set, issues }: SectionProps) {
+  const cal = config.calendar;
+  const [options, setOptions] = useState<{ id: string; name: string; status: string; kind: string; minutes: number }[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, startLoad] = useTransition();
+  const pickId = useId();
+
+  const load = () =>
+    startLoad(async () => {
+      setError(null);
+      const r = await loadBookables();
+      if (!r.ok) return setError(r.error);
+      setOptions([...r.bookables].sort((a, b) => Number(b.status === "live") - Number(a.status === "live")));
+    });
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-line bg-black/20 p-4">
+      <Toggle
+        label="Let the agent request appointments on your Votel calendar"
+        hint="The caller picks a day and time, and the agent adds a request to your calendar. Your team confirms it, so the agent says it's a request, never that it's booked."
+        checked={Boolean(cal)}
+        onChange={(on) => {
+          set("calendar", on ? { service_id: "", service_name: "", duration_minutes: 60 } : null);
+          if (on && !options) load();
+        }}
+      />
+      {cal && (
+        <>
+          <div>
+            <label className="label" htmlFor={pickId}>Booking service in Votel</label>
+            {options ? (
+              <select
+                id={pickId} className="field" value={cal.service_id}
+                onChange={(e) => {
+                  const b = options.find((o) => o.id === e.target.value);
+                  set("calendar", b ? { service_id: b.id, service_name: b.name, duration_minutes: b.minutes } : { ...cal, service_id: "", service_name: "" });
+                }}
+              >
+                <option value="">Choose a service…</option>
+                {options.map((o) => (
+                  <option key={o.id} value={o.id}>{o.name} ({o.minutes} min{o.status === "live" ? "" : ", not live"})</option>
+                ))}
+              </select>
+            ) : (
+              <button type="button" id={pickId} className="btn" onClick={load} disabled={loading}>
+                {loading ? "Loading from Votel…" : cal.service_name ? `Change service (now: ${cal.service_name})` : "Choose a service from Votel"}
+              </button>
+            )}
+            <p role="alert" className="mt-1 text-sm text-danger empty:sr-only">{error ?? ""}</p>
+            {cal.service_name && <p className="hint">Requests go to “{cal.service_name}”, on whichever calendar that service writes to.</p>}
+          </div>
+          <NumberField
+            label="Appointment length (minutes)" value={cal.duration_minutes} min={5} max={480}
+            path="calendar.duration_minutes" issues={issues}
+            onChange={(v) => set("calendar", { ...cal, duration_minutes: v })}
+          />
+          <p className="text-xs text-muted">
+            Create or edit booking services in Votel under Calendars, then Bookables. Requests are saved as pending
+            until someone on your team confirms them.
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 

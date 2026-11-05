@@ -79,3 +79,51 @@ def as_brief(name: str, digest: str) -> str:
         "agent take a message instead.\n\n"
         f"--- the existing agent, exactly as it is set up ---\n{body}\n--- end ---"
     )
+
+
+# "- Free Plumbing Estimate [LIVE] [appointment] 60min id: <uuid>"
+_BOOKABLE = re.compile(
+    r"^-\s+(?P<name>.+?)\s+\[(?P<status>[A-Za-z_]+)\]\s+\[(?P<kind>[a-z]+)\]\s+(?P<minutes>\d+)\s*min\s+id:\s*"
+    rf"(?P<id>{UUID.pattern})",
+    re.IGNORECASE,
+)
+
+
+@dataclass(frozen=True)
+class Bookable:
+    id: str
+    name: str
+    status: str
+    kind: str
+    minutes: int
+
+    def to_json(self) -> dict[str, str | int]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "status": self.status,
+            "kind": self.kind,
+            "minutes": self.minutes,
+        }
+
+
+def parse_bookables(text: str) -> list[Bookable]:
+    """Votel's booking services (what a customer can book), one per line of text."""
+    found = []
+    for line in text.splitlines():
+        m = _BOOKABLE.match(line.strip())
+        if m:
+            found.append(
+                Bookable(
+                    id=m["id"].lower(),
+                    name=html.unescape(m["name"]).strip(),
+                    status=m["status"].lower(),
+                    kind=m["kind"].lower(),
+                    minutes=int(m["minutes"]),
+                )
+            )
+    return found
+
+
+async def list_bookables(cfg: VotelConfig) -> list[Bookable]:
+    return parse_bookables(await call_tool(cfg, "list_bookables", {}))

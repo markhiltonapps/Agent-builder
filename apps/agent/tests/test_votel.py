@@ -340,3 +340,22 @@ async def test_an_urgent_request_is_a_high_priority_task(votel):
     await sync_call(_cfg(votel), _loaded(), _record(tool_calls=[msg]), "c", source="phone")
     task = next(a for n, a in votel.calls if n == "create_task")
     assert task["priority"] == "high" and task["title"].startswith("URGENT: call back Bo Kim")
+
+
+async def test_an_appointment_already_on_the_calendar_makes_no_extra_task(votel):
+    msg = {
+        "tool": "request_appointment",
+        "ok": True,
+        "args": {
+            "first_name": "Ana",
+            "last_name": "Ruiz",
+            "reason": "Leaking faucet",
+            "date": "2026-12-01",
+            "time": "14:30",
+        },
+    }
+    await sync_call(_cfg(votel), _loaded(), _record(tool_calls=[msg]), "c", source="phone")
+    names = [n for n, _ in votel.calls]
+    assert names == ["create_contact", "add_note"]  # the booking itself is the follow-up
+    note = next(a for n, a in votel.calls if n == "add_note")["note"]
+    assert "appointment requested on the calendar" in note and "2026-12-01" in note

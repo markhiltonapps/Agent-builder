@@ -41,3 +41,27 @@ export async function importVotelAgent(agentId: string): Promise<{ ok: true; nam
     return { ok: false, error: "The import took too long. Try again." };
   }
 }
+
+export interface VotelBookable {
+  id: string;
+  name: string;
+  status: string;
+  kind: string;
+  minutes: number;
+}
+
+/** The booking services in the connected Votel account, for choosing where appointments go. */
+export async function listVotelBookables(): Promise<{ ok: true; bookables: VotelBookable[] } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`${env.builderApiUrl}/v1/votel/bookables`, {
+      headers: { Authorization: `Bearer ${env.builderApiSecret}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(30_000),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (res.ok && body.ok) return { ok: true, bookables: body.bookables as VotelBookable[] };
+    return { ok: false, error: res.status === 503 ? "Votel isn't connected yet." : "We couldn't reach Votel just now. Try again in a minute." };
+  } catch {
+    return { ok: false, error: "We couldn't reach Votel just now. Try again in a minute." };
+  }
+}

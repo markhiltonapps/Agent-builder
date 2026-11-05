@@ -56,6 +56,7 @@ export interface AgentConfig {
   tools: ToolDefinition[];
   adapters: Record<string, AdapterConfig>;
   booking?: { url: string; channel: "sms" | "email" } | null;
+  calendar?: { service_id: string; service_name: string; duration_minutes: number } | null;
   runtime: {
     voice: ModelSpec;
     fallbacks: ModelSpec[];

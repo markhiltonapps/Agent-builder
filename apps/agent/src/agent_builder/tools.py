@@ -4,17 +4,20 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from livekit.agents import RunContext, ToolError, function_tool
 from livekit.agents.llm import RawFunctionTool
 
 from .adapters import Adapter, ToolFailed, build_adapter
 from .compiler import CompiledAgent
-from .config import AgentConfig, BookingLink, ToolDefinition
+from .config import AgentConfig, BookingLink, CalendarBooking, ToolDefinition
 from .votel import VotelError, call_tool, votel_config
 from .votel_sync import normalize_phone
 
@@ -294,6 +297,154 @@ def _booking_tool(
     )
 
 
+_CLOCK = re.compile(r"^\s*(\d{1,2})(?::(\d{2}))?\s*([ap]\.?m\.?)?\s*$", re.IGNORECASE)
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_TAKEN = re.compile(
+    r"conflict|unavailable|not available|already booked|overlap|taken", re.IGNORECASE
+)
+
+
+def parse_when(date_text: str, time_text: str, tz: str, now: datetime | None = None) -> datetime:
+    """The requested start as a timezone-aware time. Raises ToolFailed with a plain reason."""
+    zone = ZoneInfo(tz)
+    now = now or datetime.now(zone)
+    try:
+        day = datetime.strptime(date_text.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        raise ToolFailed("the date must be a real day written as YYYY-MM-DD") from None
+    m = _CLOCK.match(time_text)
+    if not m:
+        raise ToolFailed("the time must be a clock time such as 14:30")
+    hour, minute, meridiem = int(m[1]), int(m[2] or 0), (m[3] or "").lower().replace(".", "")
+    if meridiem == "pm" and hour < 12:
+        hour += 12
+    if meridiem == "am" and hour == 12:
+        hour = 0
+    if hour > 23 or minute > 59:
+        raise ToolFailed("the time must be a clock time such as 14:30")
+    start = datetime(day.year, day.month, day.day, hour, minute, tzinfo=zone)
+    if start <= now:
+        raise ToolFailed("that time has already passed; ask for a day and time in the future")
+    if start > now + timedelta(days=366):
+        raise ToolFailed("that is too far ahead; ask for a date within the next year")
+    return start
+
+
+def _appointment_tool(
+    calendar: CalendarBooking,
+    cfg: AgentConfig,
+    recorder: CallRecorder,
+    caller: Callable[[], str | None],
+) -> RawFunctionTool:
+    """Ask the team's Votel calendar for an appointment. Saved as pending: a person confirms.
+
+    If the calendar cannot take it, the tool fails and the agent is told to take a message, so a
+    caller is never promised a slot that was not requested.
+    """
+
+    async def handler(raw_arguments: dict[str, object], context: RunContext) -> str:
+        args = {k: str(v).strip() for k, v in raw_arguments.items() if str(v).strip()}
+        started = time.perf_counter()
+        try:
+            votel = votel_config()
+            if votel is None:
+                raise VotelError("Votel is not connected")
+            phone = normalize_phone(args.get("phone")) or normalize_phone(caller())
+            if not phone:
+                raise ToolFailed("I need a phone number for the caller first")
+            if not (args.get("first_name") and args.get("last_name")):
+                raise ToolFailed("I need the caller's first and last name first")
+            tz = cfg.persona.timezone
+            start = parse_when(args.get("date", ""), args.get("time", ""), tz)
+            end = start + timedelta(minutes=calendar.duration_minutes)
+            booking: dict[str, Any] = {
+                "booking_config_id": calendar.service_id,
+                "starts_at": start.strftime("%Y-%m-%dT%H:%M:%S"),
+                "ends_at": end.strftime("%Y-%m-%dT%H:%M:%S"),
+                "duration_minutes": calendar.duration_minutes,
+                "timezone": tz,
+                "client_name": f"{args['first_name']} {args['last_name']}",
+                "client_phone": phone,
+                "client_notes": args.get("reason", "")[:500],
+                "status": "pending",
+                "internal_notes": (
+                    f"Requested on a call with {cfg.persona.agent_name}, the phone agent. "
+                    "Not confirmed: please confirm the time with the caller."
+                ),
+            }
+            if _EMAIL.match(args.get("email", "")):
+                booking["client_email"] = args["email"]
+            await call_tool(votel, "create_booking", booking)
+            when = f"{start.strftime('%A, %B')} {start.day} at {start.strftime('%I:%M %p').lstrip('0')}"
+            result, ok = (
+                {
+                    "status": "requested",
+                    "when": when,
+                    "say": f"I've put in a request for {when}. The team will confirm it with you.",
+                },
+                True,
+            )
+        except ToolFailed as e:
+            result, ok = {"error": str(e)}, False
+        except VotelError as e:
+            log.warning("appointment not requested: %s", e)
+            taken = bool(_TAKEN.search(str(e)))
+            result, ok = (
+                (
+                    {"error": "that time is not available", "taken": True}
+                    if taken
+                    else {"error": "the calendar could not take the request right now"}
+                ),
+                False,
+            )
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        recorder.calls.append(
+            ToolCallRecord("request_appointment", args, ok, result, latency_ms, ok)
+        )
+        if not ok:
+            hint = (
+                "Offer a different day or time."
+                if result.get("taken")
+                or "ask for" in result["error"]
+                or "must be" in result["error"]
+                else "Apologize, and take the details with take_message using request_type 'appointment'."
+            )
+            raise ToolError(f"request_appointment failed: {result['error']}. {hint}")
+        return json.dumps(result)
+
+    return function_tool(
+        handler,
+        raw_schema={
+            "name": "request_appointment",
+            "description": (
+                f'Request an appointment for "{calendar.service_name}" on the team\'s calendar. It is '
+                "only a request: the team confirms it, so never say it is booked. Read the day, time "
+                "and phone number back to the caller before you call this."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "first_name": {"type": "string", "description": "Caller's first name."},
+                    "last_name": {"type": "string", "description": "Caller's last name."},
+                    "phone": {
+                        "type": "string",
+                        "description": "Callback number, if different from the number they are calling from.",
+                    },
+                    "email": {"type": "string", "description": "Email address, if given."},
+                    "reason": {"type": "string", "description": "What the appointment is for."},
+                    "date": {"type": "string", "description": "The day, as YYYY-MM-DD."},
+                    "time": {
+                        "type": "string",
+                        "description": "The start time, 24-hour, like 14:30.",
+                    },
+                },
+                "required": ["first_name", "last_name", "reason", "date", "time"],
+                "additionalProperties": False,
+            },
+        },
+    )
+
+
 def build_tools(
     cfg: AgentConfig,
     compiled: CompiledAgent,
@@ -314,4 +465,6 @@ def build_tools(
     tools.append(_message_tool(recorder))
     if cfg.booking:
         tools.append(_booking_tool(cfg.booking, cfg, recorder, caller or (lambda: None)))
+    if cfg.calendar:
+        tools.append(_appointment_tool(cfg.calendar, cfg, recorder, caller or (lambda: None)))
     return tools, adapters
