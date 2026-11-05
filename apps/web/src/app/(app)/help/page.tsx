@@ -5,6 +5,7 @@ export const metadata: Metadata = { title: "Help" };
 
 const SECTIONS = [
   ["start", "Quick start"],
+  ["around", "Finding your way around"],
   ["clients", "Clients"],
   ["pick", "Pick a ready-made agent"],
   ["edit", "Make it yours"],
@@ -83,37 +84,55 @@ export default function HelpPage() {
           <li>Choose <B>Publish</B>. Then add a phone number, or put it on a website.</li>
         </Steps>
 
+        <H id="around">Finding your way around</H>
+        <P>
+          The app has two levels, so you always know whether you are looking at everything or at one client.
+        </P>
+        <Steps>
+          <li><B>All clients</B> is your home. The top bar shows <B>All clients</B>, <B>All calls</B>, <B>Usage and billing</B> and <B>Help</B>. Clicking <B>Neato Agent Builder</B> at the top left always brings you here.</li>
+          <li><B>Inside a client</B> starts when you click a client&apos;s name or <B>Open</B>. A coloured bar under the top bar names the client, and holds everything about that client: <B>Dashboard</B>, <B>Agents</B>, <B>Knowledge</B>, <B>Calls</B>, <B>Phone numbers</B> and <B>Settings</B>.</li>
+          <li>To go back up, click <B>◂ All clients</B> at the top left of the top bar.</li>
+        </Steps>
+        <Shot name="around" height={620} alt="Inside a client: the coloured bar names Right Weight Scale and lists its Dashboard, Agents, Knowledge, Calls, Phone numbers and Settings, with All clients at the top left"
+          caption="1: back to All clients. 2: which client you are in (and a menu to switch to another). 3: everything about that client." />
+        <Tip>
+          If you ever wonder whose dashboard or agents you are looking at, look at the coloured bar: it always says. Anything that
+          covers every client at once (the list of clients, all calls, usage and billing) is only on the All clients level, so it
+          can&apos;t be mistaken for one client&apos;s numbers.
+        </Tip>
+
         <H id="clients">Clients</H>
         <P>
-          Each client has its own agents, calls and numbers, so nothing gets mixed up. Open <B>Clients</B> in the top bar to
-          see them all, add a new one, and switch between them. Once you have two or more, a switcher appears in the top bar.
+          Each client has its own agents, calls, knowledge and numbers, so nothing gets mixed up. <B>All clients</B> lists them in a
+          table: how many agents are live, calls and minutes over the last 30 days, phone numbers, and when the last customer call
+          was. Type in the search box to find one. Click a client&apos;s name, or <B>Open</B>, to go inside it, and add a new client
+          from the panel under the table.
         </P>
         <P>
-          <B>To edit a client&apos;s agent:</B> on the client&apos;s card, find its agent under <B>Agents for</B> that client and
-          choose <B>Edit</B>. That switches you to the client and opens the agent. Choose <B>All agents</B> to see all of that
-          client&apos;s agents, <B>New agent</B> to add one, or <B>Calls</B> and <B>Dashboard</B> to see how it is doing. The
-          editor shows a <B>Client:</B> label under the agent&apos;s name, so you always know whose agent you are changing.
-          If you use the client switcher in the top bar while editing an agent, you are taken to the new client&apos;s agents
-          rather than left on the old client&apos;s agent.
+          <B>To edit a client&apos;s agent:</B> open the client, then <B>Agents</B>, then the agent. The editor shows a
+          <B> Client:</B> label under the agent&apos;s name. If you switch client with the menu in the coloured bar while editing an
+          agent, you are taken to the new client&apos;s agents rather than left on the old client&apos;s agent. <B>All calls</B>, on the
+          top bar, lists the latest calls from every client in one place with a Client column, and choosing a call opens it inside
+          its own client.
         </P>
-        <Shot name="clients" height={1000} alt="The Clients page: each client card lists its agents with an Edit button, quick links, and the client switcher in the top bar"
-          caption="1: Edit opens that client's agent for editing. 2: quick links for that client: all its agents, a new agent, its calls, its dashboard. 3: the client switcher in the top bar." />
+        <Shot name="clients" height={620} alt="The All clients page: a table of clients with agents live, calls, minutes, phone numbers and last call, and an Open button for each"
+          caption="1: search. 2: a client's name opens it. 3: how busy each client was in the last 30 days. 4: Open." />
         <P>
           Clients and Votel stay in step, in both directions, through one tag: <B>agent-builder-client</B>.
         </P>
-        <Shot name="clients-votel" height={420} alt="The Add a client form and the Add from Votel panel at the bottom of the Clients page"
-          caption="At the bottom of the Clients page: add a client here (and in Votel), or bring clients over from Votel with Add from Votel." />
+        <Shot name="clients-votel" height={420} alt="The Add a client form and the Add from Votel panel at the bottom of the All clients page"
+          caption="At the bottom of the All clients page: add a client here (and in Votel), or bring clients over from Votel with Add from Votel." />
         <Steps>
           <li><B>From Votel to here:</B> in Votel, open a contact and give it the tag <B>agent-builder-client</B>. Back here, choose <B>Check Votel for clients</B> (under <B>Add from Votel</B>) and then <B>Add as client</B>. It becomes a client with its own empty workspace. If the contact has a company name, that is the client&apos;s name.</li>
-          <li><B>From here to Votel:</B> when you add a client, leave <B>Also add this client to Votel</B> ticked. A contact is created in Votel with the tag, or the existing one with the same email or phone is found and tagged. For a client you already had, choose <B>Send to Votel</B> on its card.</li>
-          <li><B>What follows:</B> each client card shows <B>Linked to a Votel contact</B>. After that, a one-line note is added to that contact whenever one of the client&apos;s agents takes a call, and new agent cards on the Agent Builder OS board are attached to it.</li>
+          <li><B>From here to Votel:</B> when you add a client, leave <B>Also add this client to Votel</B> ticked. A contact is created in Votel with the tag, or the existing one with the same email or phone is found and tagged. For a client you already had, open the client, choose <B>Settings</B> and then <B>Send to Votel</B>.</li>
+          <li><B>What follows:</B> the client&apos;s <B>Settings</B> show <B>Linked to a Votel contact</B>. After that, a one-line note is added to that contact whenever one of the client&apos;s agents takes a call, and new agent cards on the Agent Builder OS board are attached to it.</li>
         </Steps>
         <Tip>
-          <B>Unlink</B> on a card only stops the matching: the client stays here and the contact stays in Votel. A Votel
+          <B>Unlink</B> in Settings only stops the matching: the client stays here and the contact stays in Votel. A Votel
           contact can belong to one client only.
         </Tip>
         <P>
-          To remove a client for good, choose <B>Remove client</B> at the bottom of its card (you need at least two clients, and
+          To remove a client for good, open the client, choose <B>Settings</B> and then <B>Remove client</B> (you need at least two clients, and
           you must be its owner). It deletes the client here: its agents, calls and settings, so download its usage first if you
           need it for billing. You type the client&apos;s name to confirm, and if it is linked to Votel you choose what happens to
           its contact: <B>leave it</B>, <B>take off the agent-builder-client tag</B> (the contact and its history stay), or
@@ -171,10 +190,10 @@ export default function HelpPage() {
 
         <H id="knowledge">Give your agent knowledge</H>
         <P>
-          Open <B>Knowledge</B> in the top bar. This is where you put the facts your agents answer from: prices, opening hours,
-          services, policies and the answers to questions callers ask again and again. Knowledge belongs to the client you are working in (the
-          <B>Client</B> menu at the top). Only that client&apos;s agents use it, and what you add for one client is never heard by another.
-          To add knowledge for a different client, choose that client in the menu first, or press <B>Knowledge</B> on its card under <B>Clients</B>.
+          Inside a client, open <B>Knowledge</B>. This is where you put the facts your agents answer from: prices, opening hours,
+          services, policies and the answers to questions callers ask again and again. Knowledge belongs to the client you are working in (it is
+          named in the coloured bar). Only that client&apos;s agents use it, and what you add for one client is never heard by another.
+          To add knowledge for a different client, open that client first (click it under <B>All clients</B>, or use the client menu in the coloured bar), then choose <B>Knowledge</B>.
         </P>
         <Shot name="knowledge" height={800} alt="The Knowledge page: a box to choose or drop files, a place to write a document, and a list of documents with who uses each"
           caption="1: choose or drop files. 2: or write a document here. 3: a document; click it to read or change it. 4: which agents use it." />
@@ -263,7 +282,7 @@ export default function HelpPage() {
 
         <H id="numbers">Get a phone number</H>
         <P>
-          Open <B>Numbers</B>. Type an area code (add up to three, like 602, 480). If you want certain digits, such as 7777,
+          Inside the client, open <B>Phone numbers</B>. Type an area code (add up to three, like 602, 480). If you want certain digits, such as 7777,
           type them and say whether they should be anywhere in the number, at the start or at the end. Choose which agent
           should answer, then <B>Rent this number</B>. Only the owner of a client can rent or release numbers.
         </P>
@@ -307,7 +326,7 @@ export default function HelpPage() {
 
         <H id="share">Share with a client</H>
         <P>
-          Give a client their own dashboard without a login. On the <B>Clients</B> page, choose <B>Create dashboard link</B>
+          Give a client their own dashboard without a login. Inside the client, open <B>Settings</B> and choose <B>Create dashboard link</B>
           under the client, copy it and send it. They see the same numbers and chart, and nothing else: no transcripts, no
           summaries, no phone numbers.
         </P>
@@ -319,7 +338,7 @@ export default function HelpPage() {
 
         <H id="usage">Usage and billing</H>
         <P>
-          Open <B>Usage</B> in the top bar to see the total minutes for each client, month by month. Use the arrows to move
+          Open <B>Usage and billing</B> in the top bar to see the total minutes for each client, month by month. Use the arrows to move
           between months. Only clients you own are listed, so each person only sees their own.
         </P>
         <Shot name="usage" height={560} alt="The Usage page: a month, the minutes for each client, billable minutes and download buttons"

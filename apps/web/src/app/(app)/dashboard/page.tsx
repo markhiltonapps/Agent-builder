@@ -42,7 +42,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
       <div className="rise flex flex-wrap items-end justify-between gap-3" style={step(0)}>
         <div>
           <h1 id="dash-h" className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-sm text-muted">{current.name}</p>
+          <p className="mt-1 text-sm text-muted">How {current.name} is doing. <Link href="/clients" className="link">See all clients</Link></p>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-2">
           <nav aria-label="Time period" className="flex gap-1">

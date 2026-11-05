@@ -35,8 +35,8 @@ export default async function KnowledgePage() {
         <p role="note" className="mt-3 max-w-2xl rounded-2xl border border-accent/30 bg-accent/10 p-3 text-sm leading-relaxed text-text">
           You are adding knowledge for <strong className="font-medium">{current.name}</strong>. Only {current.name}&apos;s agents
           ({(agents ?? []).length ? (agents ?? []).map((a) => a.name).join(", ") : "none yet"}) can use it, and no other client&apos;s
-          agent ever sees it. To add knowledge for a different client, choose that client in the <strong className="font-medium">Client</strong> menu at
-          the top. To keep a document to one of {current.name}&apos;s agents, open it and choose <strong className="font-medium">Only the ones I choose</strong>.
+          agent ever sees it. To add knowledge for a different client, use the <strong className="font-medium">Switch client</strong> menu in the bar above, or open it from
+          <strong className="font-medium"> All clients</strong>. To keep a document to one of {current.name}&apos;s agents, open it and choose <strong className="font-medium">Only the ones I choose</strong>.
         </p>
       </div>
 

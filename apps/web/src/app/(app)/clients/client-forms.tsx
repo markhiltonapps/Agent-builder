@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useActionState, useId, useRef, useState, useTransition } from "react";
 import { addClient, addClientFromVotel, loadVotelClients, removeClient, removeVotelContact, sendClientToVotel, setClientShare, unlinkClientFromVotel, type VotelRemoval } from "@/app/actions";
 import type { VotelClient } from "@/lib/votel-clients";
@@ -197,6 +198,7 @@ export function ShareControl({ accountId, initialToken, appUrl }: { accountId: s
 
 /** Remove a client for good, with a choice about its Votel contact and the client's name typed to confirm. */
 export function RemoveClient({ accountId, name, linked }: { accountId: string; name: string; linked: boolean }) {
+  const router = useRouter();
   const ref = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<VotelRemoval>("untag");
   const [typed, setTyped] = useState("");
@@ -213,6 +215,7 @@ export function RemoveClient({ accountId, name, linked }: { accountId: string; n
       const r = await removeClient(accountId, linked ? mode : "keep", typed);
       if (!r.ok) return setError(r.error);
       close();
+      router.push("/clients"); // the client you were in is gone: back to the list
     });
 
   return (
