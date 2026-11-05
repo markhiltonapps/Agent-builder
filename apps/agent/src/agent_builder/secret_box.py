@@ -1,11 +1,14 @@
 """Encrypt a secret before it is stored (a client's Votel key), with a key that lives only in the servers' environment.
 
 The database holds only the encrypted text, so a copy of the database does not reveal the keys. ``SECRETS_KEY`` is a
-Fernet key (``Fernet.generate_key()``); it is set on every server that reads or writes a stored secret.
+long random string (at least 32 characters; a Fernet key also works); it is set on every server that reads or
+writes a stored secret. Anything that is not already a Fernet key is stretched into one with SHA-256.
 """
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import os
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -21,8 +24,11 @@ def _fernet(key: str | None = None) -> Fernet:
         raise SecretError("SECRETS_KEY is not set")
     try:
         return Fernet(raw.encode())
-    except ValueError as e:
-        raise SecretError("SECRETS_KEY is not a valid key") from e
+    except ValueError:
+        pass
+    if len(raw) < 32:
+        raise SecretError("SECRETS_KEY is too short (use at least 32 random characters)")
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(raw.encode()).digest()))
 
 
 def seal(plain: str, *, key: str | None = None) -> str:

@@ -160,3 +160,12 @@ async def test_an_unreadable_stored_key_falls_back_to_the_main_account(db):
     db.rows[ACCT] = {"account_id": ACCT, "encrypted_key": "garbage", "votel_account_name": "x"}
     cfg = await votel_config_for(ACCT, creds=(db.url, "sb_secret_x"))
     assert isinstance(cfg, VotelConfig) and cfg.key == "sk_main_key_for_the_agency_000"
+
+
+def test_secrets_key_can_be_any_long_random_string():
+    k = "x" * 48
+    assert unseal(seal("sk_abc", key=k), key=k) == "sk_abc"
+    with pytest.raises(SecretError):
+        unseal(seal("sk_abc", key=k), key="y" * 48)
+    with pytest.raises(SecretError, match="too short"):
+        seal("sk_abc", key="short")
