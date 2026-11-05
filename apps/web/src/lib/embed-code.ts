@@ -54,17 +54,6 @@ export function isSameOrigin(originHeader: string | null, ours: string | string[
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: string) => UUID.test(v);
 
-export function scriptSnippet(appUrl: string, agentId: string, label = "Talk to us"): string {
-  const base = appUrl.replace(/\/$/, "");
-  const safe = label.replace(/[<>"&]/g, "").slice(0, 40) || "Talk to us";
-  return `<script src="${base}/embed.js" data-agent="${agentId}" data-label="${safe}" async></script>`;
-}
-
-export function iframeSnippet(appUrl: string, agentId: string): string {
-  const base = appUrl.replace(/\/$/, "");
-  return `<iframe src="${base}/embed/${agentId}" title="Talk to our AI assistant" width="380" height="560" style="border:0;border-radius:16px" allow="microphone; autoplay" referrerpolicy="origin"></iframe>`;
-}
-
 /**
  * A small in-memory limiter: at most `max` hits per `windowMs` per key. It resets when the
  * server restarts, which is fine: it only slows down one visitor; the daily cap per agent is

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { frameAncestors, iframeSnippet, isSameOrigin, isUuid, makeLimiter, normalizeSite, parseSites, scriptSnippet } from "./embed-code.ts";
+import { frameAncestors, isSameOrigin, isUuid, makeLimiter, normalizeSite, parseSites } from "./embed-code.ts";
+import { iframeSnippet, scriptSnippet } from "./embed-style.ts";
 
 test("a typed site becomes a clean origin", () => {
   assert.equal(normalizeSite("Example.com"), "https://example.com");

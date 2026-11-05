@@ -150,17 +150,26 @@ export default function HelpPage() {
 
         <H id="website">Put it on a website</H>
         <P>
-          Open the agent and choose <B>Put on website</B>. Switch it on and save, then copy one of the two codes:
-          a <B>floating button</B> (easiest) or a <B>call box</B> built into the page. Paste it into the website. Visitors
-          click, allow their microphone, and talk to the live agent. Their calls show up under Calls and on the Dashboard,
-          marked Website.
+          Open the agent and choose <B>Put on website</B>. Switch it on and save. Then design what visitors will see: the words
+          on the button, its <B>color</B>, <B>shape</B>, <B>size</B>, <B>icon</B>, how it looks (solid, glass or outline), and where it
+          sits on the screen. The preview beside the controls is a mock website running the real button, so what you see is what
+          visitors get. Switch the preview between a computer and a phone screen, and between a light and a dark page.
         </P>
-        <Shot name="embed" height={1180} alt="The Put on website page with the switch, allowed websites box and embed code"
-          caption="1: switch it on. 2: optionally list the only websites that may show it; leave it blank for any website. 3: copy the code." />
+        <Shot name="embed" height={1100} alt="The Put on website page with the button designer and a live preview"
+          caption="1: the words on the button. 2: where it sits. 3: the live preview. Below the preview is your code, with your choices already in it." />
+        <P>
+          When it looks right, copy the code and paste it into the website just before the closing body tag. You can also choose
+          <B> Built into the page</B> to place the call box right inside a page instead of floating. Visitors click, allow their
+          microphone, and talk to the live agent. Their calls show up under Calls and on the Dashboard, marked Website.
+        </P>
         <Tip>
-          Leaving the website list blank is easiest, but anyone could copy your code. The <B>Most calls per day</B> limit
-          keeps the bill safe either way. To use it in a Votel website, paste the code into the page&apos;s custom code
-          option in Votel&apos;s website builder.
+          The preview never starts a call, so you can click around freely. Your design is remembered in this browser, so you
+          can come back and adjust it later. Codes you pasted earlier keep working exactly as they were.
+        </Tip>
+        <Tip>
+          The <B>websites allowed to show it</B> list is optional. Leaving it blank is easiest, but anyone could copy your code.
+          The <B>Most calls per day</B> limit keeps the bill safe either way. To use it in a Votel website, paste the code into
+          the page&apos;s custom code option in Votel&apos;s website builder.
         </Tip>
 
         <H id="numbers">Get a phone number</H>
