@@ -18,6 +18,7 @@ from livekit.agents.llm import RawFunctionTool
 from .adapters import Adapter, ToolFailed, build_adapter
 from .compiler import CompiledAgent
 from .config import AgentConfig, BookingLink, CalendarBooking, ToolDefinition
+from .redact import redact_data
 from .votel import VotelError, call_tool, votel_config
 from .votel_sync import normalize_phone
 
@@ -35,6 +36,11 @@ class ToolCallRecord:
     result: Any
     latency_ms: int
     goal: bool
+
+    def __post_init__(self) -> None:
+        # What a tool was given and answered is recorded on the call; card details never are.
+        self.args = redact_data(self.args)
+        self.result = redact_data(self.result)
 
 
 @dataclass

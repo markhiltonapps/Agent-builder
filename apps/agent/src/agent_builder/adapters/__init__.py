@@ -32,6 +32,10 @@ def restore_adapters(adapters: dict[str, Adapter], saved: dict[str, Any]) -> Non
 
 def build_adapter(name: str, cfg: AdapterConfig) -> Adapter:
     if cfg.kind == "mock":
+        if cfg.options.get("engine") == "hotel":
+            from .hotel_demo import HotelDemoAdapter
+
+            return HotelDemoAdapter(name, cfg.options)
         from .mock import MockAdapter
 
         return MockAdapter(name, cfg.options)

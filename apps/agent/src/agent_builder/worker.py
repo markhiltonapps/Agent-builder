@@ -40,6 +40,7 @@ from .knowledge import apply_knowledge, knowledge_tools, load_knowledge
 from .loader import ROOT, resolve_config
 from .preflight import run as run_preflight
 from .providers import build_voice_model
+from .redact import redact_chat
 from .session_store import ConversationStore, SavedCall, Saver, store_from_env
 from .tools import CallRecorder, build_tools
 from .voice_failover import effective_models, health, model_key, next_after_failure, pick_start
@@ -247,7 +248,7 @@ async def entrypoint(ctx: JobContext) -> None:
                 pass  # session not running yet; keep the last conversation we had
         return SavedCall(
             room=room,
-            chat=last_conversation["ctx"].to_dict(),
+            chat=redact_chat(last_conversation["ctx"].to_dict()),
             tool_calls=recorder.to_json(),
             transferred=recorder.transferred,
             transfer_reason=recorder.transfer_reason,
@@ -294,7 +295,7 @@ async def entrypoint(ctx: JobContext) -> None:
             "transferred": recorder.transferred,
             "transfer_reason": recorder.transfer_reason,
             "tool_calls": recorder.to_json(),
-            "transcript": last_conversation["ctx"].to_dict(),
+            "transcript": redact_chat(last_conversation["ctx"].to_dict()),
         }
         path = CALL_LOG_DIR / f"{int(started)}-{room}.json"
         path.write_text(json.dumps(record, indent=2, default=str))

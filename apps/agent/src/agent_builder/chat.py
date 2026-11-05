@@ -39,6 +39,7 @@ from .compiler import CompiledAgent, compile_agent
 from .finish_queue import finish_call
 from .knowledge import Knowledge, Searcher, apply_knowledge, knowledge_tools, load_knowledge
 from .loader import LoadedConfig, published_source
+from .redact import redact_text
 from .tools import CallRecorder, build_tools
 
 log = logging.getLogger("agent_builder.chat")
@@ -316,14 +317,14 @@ class ChatService:
                 raise ChatError("limit")
             before = (s.last_id, s.turns, len(s.transcript), s.recorder.to_json())
             s.turns += 1
-            s.transcript.append(("user", text))
+            s.transcript.append(("user", redact_text(text)))
             try:
                 reply = await self._reply(s, text)
             except ChatError:
                 s.last_id, s.turns = before[0], before[1]
                 del s.transcript[before[2] :]
                 raise
-            s.transcript.append(("assistant", reply))
+            s.transcript.append(("assistant", redact_text(reply)))
             s.last_at = self._clock()
             await self._save(s)
         return reply

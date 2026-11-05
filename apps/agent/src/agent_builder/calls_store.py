@@ -16,6 +16,7 @@ import aiohttp
 
 from . import supabase
 from .loader import LoadedConfig
+from .redact import redact_text
 
 log = logging.getLogger("agent_builder.calls_store")
 
@@ -36,7 +37,7 @@ def transcript_lines(chat: dict[str, Any]) -> list[dict[str, str]]:
         text = " ".join(c for c in item.get("content", []) if isinstance(c, str)).strip()
         if text:
             who = "caller" if item["role"] == "user" else "agent"
-            lines.append({"who": who, "text": text[:MAX_TEXT]})
+            lines.append({"who": who, "text": redact_text(text)[:MAX_TEXT]})
     return lines[:MAX_TRANSCRIPT_LINES]
 
 
