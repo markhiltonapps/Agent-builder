@@ -11,6 +11,15 @@ export const metadata: Metadata = { title: "Call" };
 interface Line { who: "caller" | "agent"; text: string }
 interface ToolCall { tool: string; args: Record<string, unknown>; ok: boolean; result: unknown; latency_ms: number; goal: boolean }
 
+/** "Voice: OpenAI" / "Voice: Gemini (backup)", plus a note if the call moved from one to the other. */
+function voiceLabel(model: unknown, channel: string | null): string | null {
+  if (channel === "chat" || !model || typeof model !== "object") return null;
+  const m = model as { provider?: string; failover_path?: string[] };
+  const name = m.provider === "google" ? "Gemini" : m.provider === "azure" ? "Azure OpenAI" : "OpenAI";
+  const moved = Array.isArray(m.failover_path) && m.failover_path.length > 1;
+  return `Voice: ${name}${m.provider === "google" ? " (backup)" : ""}${moved ? ", switched during the call" : ""}`;
+}
+
 export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
@@ -36,6 +45,7 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
           {call.channel !== "chat" && <span className="chip">{duration(Number(call.duration_s))}</span>}
           <span className="chip">Version {call.agent_version ?? "?"}</span>
           <span className="chip">{call.channel === "chat" ? "Website chat" : call.source === "phone" ? "Phone" : call.source === "web" ? "Website" : "Test call"}</span>
+          {voiceLabel(call.voice_model, call.channel) && <span className="chip" title="Which voice service answered this call">{voiceLabel(call.voice_model, call.channel)}</span>}
           {call.goal_reached && <span className="chip chip-live">Successful</span>}
           {call.transferred && <span className="chip">Transferred{call.transfer_reason ? `: ${call.transfer_reason}` : ""}</span>}
           {call.votel_synced_at && <span className="chip chip-live">In Votel CRM</span>}

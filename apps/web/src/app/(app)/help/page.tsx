@@ -330,7 +330,9 @@ export default function HelpPage() {
           Calls run on OpenAI&apos;s voice service. If it has an outage, the app can switch to a <B>backup voice from Google
           (Gemini)</B> by itself. A new call starts on the backup if the main voice has been failing, and a call already in
           progress is moved over with the conversation carried across, so the caller is not asked to start again. The backup
-          sounds a little different, and is used only when needed.
+          sounds a little different, and is used only when needed. Open any call under <B>Calls</B> and look at the labels under the
+          title: <B>Voice: OpenAI</B> or <B>Voice: Gemini (backup)</B> tells you which service answered, and it adds
+          <B> switched during the call</B> if a call moved from one to the other.
         </P>
         <P>
           On the <B>Agents</B> page, the <B>Voice status</B> line shows whether each service is answering right now. Look at it
