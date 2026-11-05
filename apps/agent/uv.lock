@@ -12,6 +12,7 @@ name = "agent-builder"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "livekit-agents", extra = ["google", "openai"] },
     { name = "mcp" },
     { name = "pydantic" },
@@ -27,6 +28,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=42" },
     { name = "livekit-agents", extras = ["openai", "google"], specifier = "~=1.8" },
     { name = "mcp", specifier = ">=1.29,<2" },
     { name = "pydantic", specifier = ">=2.14" },

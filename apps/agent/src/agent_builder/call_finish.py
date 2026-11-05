@@ -20,6 +20,7 @@ from .calls_store import (
 )
 from .summary import summarize
 from .votel import votel_config
+from .votel_accounts import votel_config_for
 from .votel_clients import note_call
 from .votel_sync import sync_call
 
@@ -77,7 +78,7 @@ async def process_call(loaded, record: dict, *, attempt: int = 0) -> str | None:
                     return "the summary could not be saved"
             elif _expects_summary(record) and attempt + 1 < SUMMARY_TRIES:
                 return "no summary yet"
-        cfg = votel_config()
+        cfg = await votel_config_for(loaded.account_id)
         if cfg is None:
             return None
         if attempt > 0 and await call_synced(call_id):
@@ -97,7 +98,11 @@ async def process_call(loaded, record: dict, *, attempt: int = 0) -> str | None:
             await mark_synced(call_id, contact_id=result.contact_id, error=result.error)
             log.warning("Votel sync failed: %s", result.error)
             return f"Votel: {result.error}"[:300]
-        await note_on_client(cfg, loaded, record, call_id)
+        main = (
+            votel_config()
+        )  # the client's own contact is in the main account, whichever account got the call
+        if main is not None:
+            await note_on_client(main, loaded, record, call_id)
         await mark_synced(call_id, contact_id=result.contact_id, error=None)
         log.info("sent to Votel")
         return None
@@ -115,7 +120,7 @@ async def after_call(loaded, record: dict) -> None:
         if call_id is None:
             return
         log.info("call saved to the database")
-        cfg = votel_config()
+        cfg = await votel_config_for(loaded.account_id)
         if cfg is None:
             return
         result = await sync_call(
@@ -129,7 +134,9 @@ async def after_call(loaded, record: dict) -> None:
         if result.skipped:
             log.info("not sent to Votel: %s", result.skipped)
         else:
-            await note_on_client(cfg, loaded, record, call_id)
+            main = votel_config()
+            if main is not None:
+                await note_on_client(main, loaded, record, call_id)
             await mark_synced(call_id, contact_id=result.contact_id, error=result.error)
             log.info(
                 "sent to Votel" if result.error is None else "Votel sync failed: %s", result.error

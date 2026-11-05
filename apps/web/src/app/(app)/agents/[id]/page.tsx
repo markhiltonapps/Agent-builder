@@ -60,6 +60,7 @@ export default async function AgentPage({ params, searchParams }: PageProps<"/ag
       notice={copied ? "Copy created. You're editing it now." : undefined}
       agent={{ id: agent.id, name: agent.name }}
       clientName={owner?.name ?? ""}
+      accountId={agent.account_id}
       initial={withDefaults(latest.config as Partial<AgentConfig>)}
       latest={{ id: latest.id, version: latest.version }}
       published={published}

@@ -51,9 +51,9 @@ export interface VotelBookable {
 }
 
 /** The booking services in the connected Votel account, for choosing where appointments go. */
-export async function listVotelBookables(): Promise<{ ok: true; bookables: VotelBookable[] } | { ok: false; error: string }> {
+export async function listVotelBookables(accountId?: string): Promise<{ ok: true; bookables: VotelBookable[] } | { ok: false; error: string }> {
   try {
-    const res = await fetch(`${env.builderApiUrl}/v1/votel/bookables`, {
+    const res = await fetch(`${env.builderApiUrl}/v1/votel/bookables${accountId ? `?account_id=${encodeURIComponent(accountId)}` : ""}`, {
       headers: { Authorization: `Bearer ${env.builderApiSecret}` },
       cache: "no-store",
       signal: AbortSignal.timeout(30_000),
@@ -64,4 +64,20 @@ export async function listVotelBookables(): Promise<{ ok: true; bookables: Votel
   } catch {
     return { ok: false, error: "We couldn't reach Votel just now. Try again in a minute." };
   }
+}
+
+/** Whether a client has its own Votel sub-account connected (never the key itself). */
+export async function clientVotelStatus(accountId: string): Promise<{ connected: boolean; accountName: string; known: boolean }> {
+  try {
+    const res = await fetch(`${env.builderApiUrl}/v1/votel/client-key?account_id=${encodeURIComponent(accountId)}`, {
+      headers: { Authorization: `Bearer ${env.builderApiSecret}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (res.ok && body.ok) return { connected: Boolean(body.connected), accountName: String(body.account_name ?? ""), known: true };
+  } catch {
+    /* fall through */
+  }
+  return { connected: false, accountName: "", known: false };
 }

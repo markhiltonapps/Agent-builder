@@ -14,6 +14,7 @@ import { logoKind, logoProblem } from "@/lib/embed-logo";
 import { importVotelAgent, listVotelBookables, type VotelBookable } from "@/lib/votel-import";
 import { getVotelClient, listVotelClients, pushVotelClient, removeVotelClient, type VotelClient } from "@/lib/votel-clients";
 import { callToken } from "@/lib/livekit";
+import { env } from "@/lib/env";
 import type { Compiled, ValidationIssue } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
 import { DEFAULT_TIME_ZONE, TIME_ZONES, applyTemplate, findTemplate } from "@/lib/template-library";
@@ -518,9 +519,53 @@ export async function setClientShare(accountId: string, enabled: boolean, rotate
 }
 
 /** The Votel booking services an agent's appointment requests can go to. Signed-in people only. */
-export async function loadBookables(): Promise<{ ok: true; bookables: VotelBookable[] } | { ok: false; error: string }> {
+export async function loadBookables(accountId?: string): Promise<{ ok: true; bookables: VotelBookable[] } | { ok: false; error: string }> {
   const supabase = await supabaseServer();
   const { data } = await supabase.auth.getClaims();
   if (!data?.claims) return { ok: false, error: "Your session ended. Sign in again to continue." };
-  return listVotelBookables();
+  // the services come from the client's own Votel account; only a client the person belongs to can be asked for
+  if (accountId) {
+    const { data: mine } = await supabase.from("accounts").select("id").eq("id", accountId).maybeSingle();
+    if (!mine) return { ok: false, error: "We couldn't find that client." };
+  }
+  return listVotelBookables(accountId);
+}
+
+async function ownerOf(accountId: string): Promise<boolean> {
+  const supabase = await supabaseServer();
+  const { data } = await supabase.from("account_members").select("role").eq("account_id", accountId);
+  return (data ?? []).some((m) => m.role === "owner");
+}
+
+const builderPost = async (path: string, body: object) => {
+  const res = await fetch(`${env.builderApiUrl}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.builderApiSecret}` },
+    body: JSON.stringify(body),
+    cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
+  });
+  return { ok: res.ok, data: (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; account_name?: string } };
+};
+
+/** The client's own Votel connection (its sub-account key). The key is never sent back to the page. */
+export async function saveClientVotelKey(accountId: string, key: string): Promise<{ ok: true; accountName: string } | { ok: false; error: string }> {
+  if (!(await ownerOf(accountId))) return { ok: false, error: "Only the owner of a client can connect its Votel account." };
+  try {
+    const r = await builderPost("/v1/votel/client-key", { account_id: accountId, key });
+    if (r.ok && r.data.ok) return { ok: true, accountName: r.data.account_name ?? "" };
+    return { ok: false, error: r.data.error ?? "We couldn't save that key. Try again in a minute." };
+  } catch {
+    return { ok: false, error: "We couldn't reach the server. Try again in a minute." };
+  }
+}
+
+export async function clearClientVotelKey(accountId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!(await ownerOf(accountId))) return { ok: false, error: "Only the owner of a client can change its Votel connection." };
+  try {
+    const r = await builderPost("/v1/votel/client-key/clear", { account_id: accountId });
+    return r.ok && r.data.ok ? { ok: true } : { ok: false, error: r.data.error ?? "We couldn't remove that connection." };
+  } catch {
+    return { ok: false, error: "We couldn't reach the server. Try again in a minute." };
+  }
 }

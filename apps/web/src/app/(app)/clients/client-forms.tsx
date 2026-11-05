@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useActionState, useId, useRef, useState, useTransition } from "react";
-import { addClient, addClientFromVotel, loadVotelClients, removeClient, removeVotelContact, renameClient, sendClientToVotel, setClientShare, unlinkClientFromVotel, type VotelRemoval } from "@/app/actions";
+import { addClient, addClientFromVotel, clearClientVotelKey, saveClientVotelKey, loadVotelClients, removeClient, removeVotelContact, renameClient, sendClientToVotel, setClientShare, unlinkClientFromVotel, type VotelRemoval } from "@/app/actions";
 import type { VotelClient } from "@/lib/votel-clients";
 import { askConfirm } from "@/lib/dialog";
 
@@ -277,6 +277,56 @@ export function RemoveClient({ accountId, name, linked }: { accountId: string; n
           </div>
         </form>
       </dialog>
+    </div>
+  );
+}
+
+/** Paste the client's own Votel sub-account key. Notes, tasks and bookings then go into that sub-account. */
+export function VotelConnection({ accountId, connected, accountName }: { accountId: string; connected: boolean; accountName: string }) {
+  const router = useRouter();
+  const id = useId();
+  const [key, setKey] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const save = () =>
+    start(async () => {
+      setError(null);
+      setNotice(null);
+      const r = await saveClientVotelKey(accountId, key);
+      if (!r.ok) return setError(r.error);
+      setKey("");
+      setNotice(r.accountName ? `Connected to “${r.accountName}”.` : "Connected.");
+      router.refresh();
+    });
+  const remove = async () => {
+    if (!(await askConfirm({ title: "Disconnect this client's Votel account?", body: "Call notes, tasks and bookings will go to your main Votel account again.", confirmLabel: "Disconnect" }))) return;
+    start(async () => {
+      setError(null);
+      setNotice(null);
+      const r = await clearClientVotelKey(accountId);
+      if (!r.ok) return setError(r.error);
+      setNotice("Disconnected.");
+      router.refresh();
+    });
+  };
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-muted">
+        {connected
+          ? <>Connected to the Votel account <strong className="text-fg">{accountName || "(unnamed)"}</strong>. Call notes, tasks and bookings for this client go into that account.</>
+          : "Not connected. Call notes, tasks and bookings go into your main Votel account. Paste the API key from this client's own Votel sub-account to send them there instead."}
+      </p>
+      <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); if (!pending && key.trim()) save(); }}>
+        <label className="label" htmlFor={id}>{connected ? "Replace the sub-account API key" : "Sub-account API key"}</label>
+        <div className="flex flex-wrap gap-2">
+          <input id={id} type="password" autoComplete="off" spellCheck={false} placeholder="sk_…" className="field !w-auto min-w-64 flex-1" value={key} onChange={(e) => setKey(e.target.value)} />
+          <button className="btn btn-primary" disabled={pending || !key.trim()}>{pending ? "Checking…" : connected ? "Replace key" : "Connect"}</button>
+          {connected && <button type="button" className="btn" disabled={pending} onClick={remove}>Disconnect</button>}
+        </div>
+      </form>
+      <p role="alert" className="text-sm text-danger empty:sr-only">{error ?? ""}</p>
+      <p role="status" className="text-sm text-ok empty:sr-only">{notice ?? ""}</p>
     </div>
   );
 }

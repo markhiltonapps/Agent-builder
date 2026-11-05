@@ -20,6 +20,7 @@ from .compiler import CompiledAgent
 from .config import AgentConfig, BookingLink, CalendarBooking, ToolDefinition, WebSearch
 from .redact import redact_data
 from .votel import VotelError, call_tool, votel_config
+from .votel_accounts import votel_config_for
 from .votel_sync import normalize_phone
 from .web_search import SearchError, WebAnswer, search_web
 
@@ -222,7 +223,11 @@ def _message_tool(recorder: CallRecorder) -> RawFunctionTool:
 
 
 def _booking_tool(
-    booking: BookingLink, cfg: AgentConfig, recorder: CallRecorder, caller: Callable[[], str | None]
+    booking: BookingLink,
+    cfg: AgentConfig,
+    recorder: CallRecorder,
+    caller: Callable[[], str | None],
+    account_id: str | None = None,
 ) -> RawFunctionTool:
     """Send the caller a link to book online, by text or email, through Votel.
 
@@ -342,6 +347,7 @@ def _appointment_tool(
     cfg: AgentConfig,
     recorder: CallRecorder,
     caller: Callable[[], str | None],
+    account_id: str | None = None,
 ) -> RawFunctionTool:
     """Ask the team's Votel calendar for an appointment. Saved as pending: a person confirms.
 
@@ -353,7 +359,7 @@ def _appointment_tool(
         args = {k: str(v).strip() for k, v in raw_arguments.items() if str(v).strip()}
         started = time.perf_counter()
         try:
-            votel = votel_config()
+            votel = await votel_config_for(account_id)
             if votel is None:
                 raise VotelError("Votel is not connected")
             phone = normalize_phone(args.get("phone")) or normalize_phone(caller())
@@ -528,6 +534,7 @@ def build_tools(
     recorder: CallRecorder,
     caller: Callable[[], str | None] | None = None,
     web_searcher: WebSearcher | None = None,
+    account_id: str | None = None,
 ) -> tuple[list[Any], dict[str, Adapter]]:
     """Return the LiveKit tools for one call and the adapters backing them.
 
@@ -542,9 +549,13 @@ def build_tools(
     tools.append(_transfer_tool(cfg, recorder))
     tools.append(_message_tool(recorder))
     if cfg.booking:
-        tools.append(_booking_tool(cfg.booking, cfg, recorder, caller or (lambda: None)))
+        tools.append(
+            _booking_tool(cfg.booking, cfg, recorder, caller or (lambda: None), account_id)
+        )
     if cfg.calendar:
-        tools.append(_appointment_tool(cfg.calendar, cfg, recorder, caller or (lambda: None)))
+        tools.append(
+            _appointment_tool(cfg.calendar, cfg, recorder, caller or (lambda: None), account_id)
+        )
     if cfg.web_search and cfg.web_search.enabled:
         tools.append(_web_search_tool(cfg.web_search, recorder, web_searcher))
     return tools, adapters

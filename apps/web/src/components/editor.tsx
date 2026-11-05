@@ -31,6 +31,7 @@ interface Props {
   notice?: string;
   agent: { id: string; name: string };
   clientName?: string;
+  accountId?: string;
   initial: AgentConfig;
   latest: { id: string; version: number };
   published: { id: string; version: number } | null;
@@ -57,7 +58,7 @@ const adapterLabel = (n: string, kind: keyof typeof KIND_LABEL) => {
   return nice === KIND_LABEL[kind] ? nice : `${nice} (${KIND_LABEL[kind]})`;
 };
 
-export function Editor({ agent, clientName, initial, latest, published, notice }: Props) {
+export function Editor({ agent, clientName, accountId, initial, latest, published, notice }: Props) {
   const router = useRouter();
   const [config, setConfig] = useState<AgentConfig>(initial);
   const [saved, setSaved] = useState(JSON.stringify(initial));
@@ -285,7 +286,7 @@ export function Editor({ agent, clientName, initial, latest, published, notice }
               />
             )}
             {section === "handoffs" && <HandoffSection config={config} set={set} issues={issues} />}
-            {section === "actions" && <ActionsSection config={config} set={set} issues={issues} />}
+            {section === "actions" && <ActionsSection config={config} set={set} issues={issues} accountId={accountId} />}
             {section === "flows" && <FlowsSection config={config} set={set} issues={issues} />}
             {section === "voice" && <VoiceSection config={config} set={set} issues={issues} />}
             {section === "advanced" && <JsonSection config={config} onValid={edit} />}
@@ -312,6 +313,7 @@ type SectionProps = {
   config: AgentConfig;
   set: <K extends keyof AgentConfig>(key: K, value: AgentConfig[K]) => void;
   issues: ValidationIssue[];
+  accountId?: string;
 };
 
 function PersonaSection({ config, set, issues }: SectionProps) {
@@ -382,7 +384,7 @@ function HandoffSection({ config, set, issues }: SectionProps) {
   );
 }
 
-function ActionsSection({ config, set, issues }: SectionProps) {
+function ActionsSection({ config, set, issues, accountId }: SectionProps) {
   const adapterNames = Object.keys(config.adapters);
   const upTool = (i: number, patch: Partial<(typeof config.tools)[number]>) =>
     set("tools", config.tools.map((t, j) => (j === i ? { ...t, ...patch } : t)));
@@ -423,7 +425,7 @@ function ActionsSection({ config, set, issues }: SectionProps) {
         })}
       </ul>
       <BookingCard config={config} set={set} issues={issues} />
-      <CalendarCard config={config} set={set} issues={issues} />
+      <CalendarCard config={config} set={set} issues={issues} accountId={accountId} />
       <WebSearchCard config={config} set={set} issues={issues} />
       {adapterNames.length > 0 && (
         <fieldset className="space-y-3">
@@ -475,7 +477,7 @@ function WebSearchCard({ config, set, issues }: SectionProps) {
 }
 
 /** Where the agent puts appointment requests: one of the Votel booking services. */
-function CalendarCard({ config, set, issues }: SectionProps) {
+function CalendarCard({ config, set, issues, accountId }: SectionProps) {
   const cal = config.calendar;
   const [options, setOptions] = useState<{ id: string; name: string; status: string; kind: string; minutes: number }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -485,7 +487,7 @@ function CalendarCard({ config, set, issues }: SectionProps) {
   const load = () =>
     startLoad(async () => {
       setError(null);
-      const r = await loadBookables();
+      const r = await loadBookables(accountId);
       if (!r.ok) return setError(r.error);
       setOptions([...r.bookables].sort((a, b) => Number(b.status === "live") - Number(a.status === "live")));
     });

@@ -23,7 +23,7 @@ from typing import Any
 from aiohttp import web
 from pydantic import ValidationError
 
-from . import embed, supabase, voice_status, votel_clients, votel_import
+from . import embed, supabase, voice_status, votel_accounts, votel_clients, votel_import
 from .chat import ChatError, ChatService
 from .compiler import compile_agent
 from .config import AgentConfig
@@ -229,9 +229,13 @@ async def votel_agents(_request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "agents": [a.to_json() for a in agents]})
 
 
-async def votel_bookables(_request: web.Request) -> web.Response:
-    """GET -> the booking services in the connected Votel account, for the calendar setting."""
-    cfg = votel_config()
+async def votel_bookables(request: web.Request) -> web.Response:
+    """GET ?account_id= -> the booking services in that client's Votel account (its sub-account if it has
+    one, else the main account), for the calendar setting."""
+    account_id = request.query.get("account_id", "")
+    cfg = await votel_accounts.votel_config_for(
+        account_id if embed.valid_agent_id(account_id) else None
+    )
     if cfg is None:
         return web.json_response({"ok": False, "error": "Votel is not connected."}, status=503)
     try:
@@ -239,6 +243,58 @@ async def votel_bookables(_request: web.Request) -> web.Response:
     except VotelError as e:
         return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
     return web.json_response({"ok": True, "bookables": [b.to_json() for b in found]})
+
+
+def _account_id(body: object) -> str:
+    value = str(body.get("account_id", "")) if isinstance(body, dict) else ""
+    if not embed.valid_agent_id(value):  # a client id is a UUID like an agent id
+        raise web.HTTPBadRequest(
+            text='{"error": "account_id is required"}', content_type="application/json"
+        )
+    return value.lower()
+
+
+async def votel_client_key_status(request: web.Request) -> web.Response:
+    """GET ?account_id= -> {"connected": bool, "account_name"}: whether this client has its own Votel connection."""
+    account_id = _account_id({"account_id": request.query.get("account_id", "")})
+    return web.json_response({"ok": True, **await votel_accounts.status(account_id)})
+
+
+async def votel_client_key_save(request: web.Request) -> web.Response:
+    """POST {"account_id", "key"} -> check the key works and is a sub-account's, then keep it encrypted."""
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    account_id = _account_id(body)
+    try:
+        account = await votel_accounts.save_key(account_id, str(body.get("key", "")))
+    except VotelError as e:
+        text = str(e)
+        friendly = (
+            text
+            if "main Votel account" in text
+            or "does not look like" in text
+            or "cannot be stored" in text
+            else (
+                "Votel did not accept that key. Check it was made inside the client's sub-account and try again."
+            )
+        )
+        return web.json_response({"ok": False, "error": friendly[:300]}, status=422)
+    return web.json_response({"ok": True, "account_name": account.name})
+
+
+async def votel_client_key_clear(request: web.Request) -> web.Response:
+    """POST {"account_id"} -> forget the client's own Votel connection; it goes back to the main account."""
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    try:
+        await votel_accounts.clear_key(_account_id(body))
+    except VotelError as e:
+        return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
+    return web.json_response({"ok": True})
 
 
 async def votel_import_agent(request: web.Request) -> web.Response:
@@ -440,6 +496,9 @@ def make_app(
     app.router.add_post("/v1/limit/hit", limit_hit)
     app.router.add_get("/v1/votel/agents", votel_agents)
     app.router.add_get("/v1/votel/bookables", votel_bookables)
+    app.router.add_get("/v1/votel/client-key", votel_client_key_status)
+    app.router.add_post("/v1/votel/client-key", votel_client_key_save)
+    app.router.add_post("/v1/votel/client-key/clear", votel_client_key_clear)
     app.router.add_post("/v1/votel/import", votel_import_agent)
     app.router.add_get("/v1/votel/clients", votel_clients_list)
     app.router.add_post("/v1/votel/client", votel_client_get)

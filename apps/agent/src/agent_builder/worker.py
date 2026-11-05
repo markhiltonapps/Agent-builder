@@ -220,7 +220,9 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.room.on("participant_connected", note_caller)
     ctx.room.on("participant_attributes_changed", note_caller)
     note_caller()
-    tools, adapters = build_tools(cfg, compiled, recorder, lambda: caller_number())
+    tools, adapters = build_tools(
+        cfg, compiled, recorder, lambda: caller_number(), account_id=loaded.account_id
+    )
     tools.extend(knowledge_tools(loaded.agent_id, knowledge, recorder))
     tools.append(EndCallTool(end_instructions=None, ignore_on_enter=True))
     store = store_from_env(CONVERSATION_DIR)

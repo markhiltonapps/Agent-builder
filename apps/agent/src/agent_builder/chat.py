@@ -181,7 +181,9 @@ class ChatService:
         cfg = loaded.config
         compiled = apply_knowledge(compile_agent(cfg, now=datetime.now(UTC)), knowledge)
         recorder = CallRecorder()
-        tools, adapters = build_tools(cfg, compiled, recorder, caller=lambda: None)
+        tools, adapters = build_tools(
+            cfg, compiled, recorder, caller=lambda: None, account_id=loaded.account_id
+        )
         tools.extend(knowledge_tools(loaded.agent_id, knowledge, recorder, self._searcher))
         by_name, specs = tool_specs(tools)
         now = self._clock()

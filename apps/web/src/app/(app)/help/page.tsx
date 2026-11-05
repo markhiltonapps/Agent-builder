@@ -133,6 +133,21 @@ export default function HelpPage() {
           contact can belong to one client only.
         </Tip>
         <P>
+          <B>A client&apos;s own Votel sub-account.</B> If the client has its own sub-account in Votel, its call notes, tasks and
+          appointment bookings can go into that sub-account instead of your main Votel account. A Votel API key only works in
+          the account it was made in, so you paste the sub-account&apos;s key once:
+        </P>
+        <Steps>
+          <li>In Votel, open the client&apos;s sub-account (from the <B>Sub-Accounts</B> page, choose to log in as it).</li>
+          <li>There, go to <B>Settings</B>, then <B>API / MCP</B>, then <B>API Keys</B>, and create a key. Copy it (it starts with <B>sk_</B>).</li>
+          <li>Back here, open the client, choose <B>Settings</B>, and paste the key under <B>Votel sub-account</B>. Choose <B>Connect</B>.</li>
+          <li>We check the key and show the sub-account&apos;s name. The key is stored scrambled and is never shown again. <B>Disconnect</B> sends everything back to the main account.</li>
+        </Steps>
+        <Tip>
+          Do this before choosing a calendar for the client&apos;s agent, so the list of booking services comes from the
+          client&apos;s own sub-account. A key from your main account is refused here on purpose.
+        </Tip>
+        <P>
           To remove a client for good, open the client, choose <B>Settings</B> and then <B>Remove client</B> (you need at least two clients, and
           you must be its owner). It deletes the client here: its agents, calls and settings, so download its usage first if you
           need it for billing. You type the client&apos;s name to confirm, and if it is linked to Votel you choose what happens to
