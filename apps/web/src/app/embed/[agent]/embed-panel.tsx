@@ -1,6 +1,7 @@
 "use client";
 
 import { Room, RoomEvent, Track, type Participant } from "livekit-client";
+import { useStickyScroll } from "@/lib/use-sticky-scroll";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type Phase = "idle" | "connecting" | "live" | "ended";
@@ -25,6 +26,7 @@ export function EmbedPanel({ agentId, title }: { agentId: string; title: string 
   const room = useRef<Room | null>(null);
   const waitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioEls = useRef<HTMLMediaElement[]>([]);
+  const { ref: transcriptRef, onScroll: onTranscriptScroll } = useStickyScroll<HTMLUListElement>(lines);
 
   const cleanup = useCallback(() => {
     if (waitTimer.current) clearTimeout(waitTimer.current);
@@ -159,7 +161,7 @@ export function EmbedPanel({ agentId, title }: { agentId: string; title: string 
       <p role="alert" className="text-sm text-danger empty:sr-only">{error ?? ""}</p>
 
       {lines.length > 0 && (
-        <ul className="max-h-48 space-y-2 overflow-y-auto rounded-2xl border border-line p-3" aria-label="Conversation so far">
+        <ul ref={transcriptRef} onScroll={onTranscriptScroll} className="max-h-48 space-y-2 overflow-y-auto rounded-2xl border border-line p-3" aria-label="Conversation so far">
           {lines.map((l) => (
             <li key={l.id} className="text-sm">
               <span className={`mr-2 font-medium ${l.who === "agent" ? "text-accent" : "text-muted"}`}>

@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase/server";
 import * as numbers from "@/lib/phone-numbers";
+import { parseAreaCodes, type Where } from "@/lib/number-match";
 
-export type SearchState = { results?: numbers.AvailableNumber[]; error?: string; area?: string } | undefined;
+export type SearchState = { results?: numbers.AvailableNumber[]; error?: string; area?: string; digits?: string; where?: Where } | undefined;
 export type Done = { ok: true; message: string } | { ok: false; error: string };
 
 /** Renting and releasing numbers costs real money, so only a workspace owner may do it. */
@@ -22,16 +23,27 @@ const FAIL = (e: unknown) =>
   e instanceof numbers.NumberError ? e.message : "Something went wrong talking to the phone service. Try again.";
 
 export async function searchNumbers(_: SearchState, form: FormData): Promise<SearchState> {
-  if (!(await owner())) return { error: OWNER_ONLY };
-  const area = String(form.get("area") ?? "").replace(/\D/g, "");
-  if (area.length !== 3) return { error: "Enter a 3-digit area code, like 602.", area };
+  const area = String(form.get("area") ?? "");
+  const digits = String(form.get("digits") ?? "").replace(/\D/g, "").slice(0, 7);
+  const where: Where = form.get("where") === "start" ? "start" : form.get("where") === "end" ? "end" : "anywhere";
+  const echo = { area, digits, where };
+  if (!(await owner())) return { error: OWNER_ONLY, ...echo };
+  const { codes, bad } = parseAreaCodes(area);
+  if (bad.length || codes.length === 0) {
+    return { error: "Enter a 3-digit area code, like 602. You can add up to three, like 602, 480.", ...echo };
+  }
   try {
-    const results = await numbers.search(area);
-    return results.length
-      ? { results, area }
-      : { error: `No numbers are available in ${area} right now. Try a nearby area code.`, area };
+    const { numbers: found, looked } = await numbers.search(codes, digits, where);
+    if (found.length) return { results: found, ...echo };
+    const where_ = where === "start" ? "starting with" : where === "end" ? "ending in" : "containing";
+    return {
+      error: digits
+        ? `None of the ${looked} numbers available in ${codes.join(", ")} right now are ${where_} ${digits}. Try fewer digits, another place in the number, or another area code.`
+        : `No numbers are available in ${codes.join(", ")} right now. Try a nearby area code.`,
+      ...echo,
+    };
   } catch (e) {
-    return { error: FAIL(e), area };
+    return { error: FAIL(e), ...echo };
   }
 }
 

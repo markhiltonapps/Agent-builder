@@ -1,5 +1,6 @@
 "use client";
 
+import { askConfirm } from "@/lib/dialog";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { publishVersion } from "@/app/actions";
@@ -28,11 +29,13 @@ export function VersionHistory({
   );
   const number = (id: string) => versions.find((v) => v.id === id)?.version;
 
-  function goLive(v: Version) {
+  async function goLive(v: Version) {
     const rollback = v.version < liveVersion;
-    const ok = window.confirm(
-      `${rollback ? "Roll back to" : "Publish"} version ${v.version}?\n\nNew calls will use it. Calls already in progress aren't affected. You can switch again at any time.`,
-    );
+    const ok = await askConfirm({
+      title: `${rollback ? "Roll back to" : "Publish"} version ${v.version}?`,
+      body: "New calls will use it. Calls already in progress aren't affected. You can switch again at any time.",
+      confirmLabel: rollback ? "Roll back" : "Publish",
+    });
     if (!ok) return;
     setMessage(null);
     startBusy(async () => {

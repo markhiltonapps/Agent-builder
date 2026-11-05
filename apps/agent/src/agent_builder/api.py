@@ -22,7 +22,7 @@ from typing import Any
 from aiohttp import web
 from pydantic import ValidationError
 
-from . import embed
+from . import embed, votel_import
 from .compiler import compile_agent
 from .config import AgentConfig
 from .draft import DraftError, draft
@@ -190,6 +190,39 @@ async def embed_begin(request: web.Request) -> web.Response:
         return web.json_response({"error": "unavailable"}, status=502)
 
 
+async def votel_agents(_request: web.Request) -> web.Response:
+    """GET -> the AI agents in the connected Votel account, for the import picker."""
+    cfg = votel_config()
+    if cfg is None:
+        return web.json_response({"ok": False, "error": "Votel is not connected."}, status=503)
+    try:
+        agents = await votel_import.list_agents(cfg)
+    except VotelError as e:
+        return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
+    return web.json_response({"ok": True, "agents": [a.to_json() for a in agents]})
+
+
+async def votel_import_agent(request: web.Request) -> web.Response:
+    """POST {"agent_id"} -> {"ok": true, "name", "config", "summary"}: a draft made from a Votel agent."""
+    cfg = votel_config()
+    if cfg is None:
+        return web.json_response({"ok": False, "error": "Votel is not connected."}, status=503)
+    agent_id = (await _text(request, "agent_id", 64)).strip()
+    try:
+        digest = await votel_import.fetch_agent(cfg, agent_id)
+        name = next(
+            (a.name for a in await votel_import.list_agents(cfg) if a.id == agent_id.lower()),
+            "Votel agent",
+        )
+    except VotelError as e:
+        return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
+    try:
+        d = await draft(votel_import.as_brief(name, digest))
+    except DraftError as e:
+        return web.json_response({"ok": False, "error": str(e)}, status=502)
+    return web.json_response({"ok": True, "name": name, "config": d.config, "summary": d.summary})
+
+
 async def schema(_request: web.Request) -> web.Response:
     return web.json_response(AgentConfig.model_json_schema())
 
@@ -218,6 +251,8 @@ def make_app(secret: str) -> web.Application:
     app.router.add_post("/v1/revise", draft_revise)
     app.router.add_get("/v1/embed/info", embed_info)
     app.router.add_post("/v1/embed/begin", embed_begin)
+    app.router.add_get("/v1/votel/agents", votel_agents)
+    app.router.add_post("/v1/votel/import", votel_import_agent)
     app.router.add_get("/v1/schema", schema)
     app.router.add_get("/healthz", healthz)
     return app

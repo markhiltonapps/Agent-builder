@@ -22,8 +22,8 @@ test("a list is split, cleaned and de-duplicated, and bad lines are reported", (
   assert.deepEqual(r.bad, ["nonsense!"]);
 });
 
-test("only valid sites can reach the frame header; none means nowhere", () => {
-  assert.equal(frameAncestors([]), "frame-ancestors 'none'");
+test("only valid sites can reach the frame header; a blank list means any site", () => {
+  assert.equal(frameAncestors([]), "frame-ancestors *");
   assert.equal(frameAncestors(["https://example.com", "https://*.example.org"]), "frame-ancestors https://example.com https://*.example.org");
   assert.equal(frameAncestors(["https://example.com; script-src *", "bad"]), "frame-ancestors 'none'");
 });

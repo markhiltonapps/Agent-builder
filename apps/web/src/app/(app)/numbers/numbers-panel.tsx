@@ -1,5 +1,6 @@
 "use client";
 
+import { askConfirm, fromText } from "@/lib/dialog";
 import { useActionState, useId, useState, useTransition } from "react";
 import { changeNumberAgent, releaseNumber, rentNumber, searchNumbers, type Done } from "@/app/numbers-actions";
 import { formatNumber } from "@/lib/phone-format";
@@ -13,10 +14,13 @@ export function NumbersPanel({ owned, agents }: { owned: Owned[]; agents: Agent[
   const [busy, startBusy] = useTransition();
   const [pick, setPick] = useState(agents[0]?.id ?? "");
   const areaId = useId();
+  const digitsId = useId();
+  const whereId = useId();
   const agentId = useId();
 
-  const run = (confirmText: string, job: () => Promise<Done>) => {
-    if (!window.confirm(confirmText)) return;
+  const run = async (confirmText: string, job: () => Promise<Done>, danger = false) => {
+    const ok = await askConfirm(fromText(confirmText, { tone: danger ? "danger" : "default", confirmLabel: danger ? "Release it" : "Yes, do it" }));
+    if (!ok) return;
     setResult(null);
     startBusy(async () => setResult(await job()));
   };
@@ -57,7 +61,7 @@ export function NumbersPanel({ owned, agents }: { owned: Owned[]; agents: Agent[
                   )}
                   <button
                     className="btn btn-quiet btn-danger" disabled={busy}
-                    onClick={() => run(`Release ${formatNumber(n.e164)}?\n\nCallers will no longer reach your agent on this number, and you stop paying for it. You may not get the same number back.`, () => releaseNumber(n.e164))}
+                    onClick={() => run(`Release ${formatNumber(n.e164)}?\n\nCallers will no longer reach your agent on this number, and you stop paying for it. You may not get the same number back.`, () => releaseNumber(n.e164), true)}
                   >
                     Release
                   </button>
@@ -78,10 +82,26 @@ export function NumbersPanel({ owned, agents }: { owned: Owned[]; agents: Agent[
           <p className="text-sm text-muted">Publish an agent first. A number rings the published version of an agent.</p>
         ) : (
           <>
-            <form action={search} className="flex flex-wrap items-end gap-3">
-              <div>
-                <label className="label" htmlFor={areaId}>Area code</label>
-                <input id={areaId} name="area" inputMode="numeric" maxLength={3} placeholder="602" required className="field w-28" defaultValue={state?.area} />
+            <form action={search} className="space-y-3">
+              <div className="flex flex-wrap items-start gap-3">
+                <div>
+                  <label className="label" htmlFor={areaId}>Area code</label>
+                  <input id={areaId} name="area" inputMode="numeric" maxLength={20} placeholder="602" required className="field w-40" defaultValue={state?.area} aria-describedby={`${areaId}-h`} />
+                  <p id={`${areaId}-h`} className="hint max-w-[11rem]">Add up to three, like 602, 480.</p>
+                </div>
+                <div>
+                  <label className="label" htmlFor={digitsId}>Digits you want (optional)</label>
+                  <input id={digitsId} name="digits" inputMode="numeric" maxLength={7} placeholder="7777" className="field w-36" defaultValue={state?.digits} aria-describedby={`${digitsId}-h`} />
+                  <p id={`${digitsId}-h`} className="hint max-w-[11rem]">Like 7777 or 1234.</p>
+                </div>
+                <div>
+                  <label className="label" htmlFor={whereId}>Where in the number</label>
+                  <select id={whereId} name="where" className="field w-40" defaultValue={state?.where ?? "anywhere"}>
+                    <option value="anywhere">Anywhere</option>
+                    <option value="end">At the end</option>
+                    <option value="start">At the start</option>
+                  </select>
+                </div>
               </div>
               <button className="btn" disabled={searching}>{searching ? "Searching…" : "Search"}</button>
             </form>

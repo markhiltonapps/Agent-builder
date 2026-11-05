@@ -7,6 +7,7 @@ import { compileConfig, draftConfig, reviseConfig } from "@/lib/builder-api";
 import { pushCard } from "@/lib/directory";
 import { MAX_SITES, parseSites } from "@/lib/embed-code";
 import { forgetEmbedInfo } from "@/lib/embed-info";
+import { importVotelAgent } from "@/lib/votel-import";
 import { callToken } from "@/lib/livekit";
 import type { Compiled, ValidationIssue } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -114,6 +115,16 @@ export async function createAgentFromTemplate(_: FormState, form: FormData): Pro
     return { error: "errors" in checked ? "Something in those details didn't fit. Shorten the business name or description and try again." : "We couldn't check the agent just now. Try again in a minute." };
   }
   return saveNewAgent(text(form, "account_id"), name, config, `Started from the ${entry.label} template`);
+}
+
+/** Make a new agent out of one that was built in Votel. It starts as a draft for the person to review. */
+export async function createAgentFromVotel(_: FormState, form: FormData): Promise<FormState> {
+  const votelId = text(form, "votel_agent");
+  if (!votelId) return { error: "Choose the Votel agent to bring over." };
+  const imported = await importVotelAgent(votelId);
+  if (!imported.ok) return { error: imported.error };
+  const name = text(form, "name") || imported.name;
+  return saveNewAgent(text(form, "account_id"), name, imported.config, `Imported from the Votel agent “${imported.name}”`);
 }
 
 async function saveNewAgent(accountId: string, name: string, config: unknown, note: string): Promise<FormState> {
@@ -292,7 +303,6 @@ export async function saveEmbed(agentId: string, enabled: boolean, sitesText: st
     return { ok: false, error: `These don't look like website addresses: ${bad.slice(0, 3).join(", ")}. Use something like example.com.` };
   }
   if (sites.length > MAX_SITES) return { ok: false, error: `Use at most ${MAX_SITES} websites.` };
-  if (enabled && sites.length === 0) return { ok: false, error: "Add the website where you'll place it first." };
   const limit = Math.round(Number(dailyLimit));
   if (!(limit >= 1 && limit <= 2000)) return { ok: false, error: "Choose a daily limit between 1 and 2000 calls." };
 

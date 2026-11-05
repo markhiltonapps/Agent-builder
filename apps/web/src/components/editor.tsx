@@ -9,7 +9,8 @@ import {
 import type { AgentConfig, ValidationIssue } from "@/lib/config";
 import { diffJson, type Json } from "@/lib/diff";
 import { friendlyName, labelFor } from "@/lib/labels";
-import { setUnsaved } from "@/lib/unsaved";
+import { askConfirm } from "@/lib/dialog";
+import { leaveIfSafe, setUnsaved } from "@/lib/unsaved";
 import { ChangeList } from "./change-list";
 import { DuplicateButton } from "./duplicate-button";
 import { AreaField, CsvField, NumberField, SelectField, StringList, TextField, Toggle } from "./fields";
@@ -107,9 +108,8 @@ export function Editor({ agent, initial, latest, published, notice }: Props) {
     }
   }, [section]);
 
-  const leaveGuard = (e: React.MouseEvent) => {
-    if (dirty && !window.confirm("You have unsaved changes. Leave without saving?")) e.preventDefault();
-  };
+  const leave = (href: string) => (e: React.MouseEvent) => leaveIfSafe(e, () => router.push(href));
+  const skipCopyAsk = useRef(false);
 
   // Every edit goes through here: a "Saved" message is about the past, so an edit clears it.
   const edit = (next: AgentConfig | ((c: AgentConfig) => AgentConfig)) => {
@@ -138,13 +138,15 @@ export function Editor({ agent, initial, latest, published, notice }: Props) {
     });
   }
 
-  function publish() {
-    const ok = window.confirm(
-      `Make version ${head.version} live?\n\nNew calls will use it. Calls already in progress aren't affected.` +
-        (usesSampleData
-          ? "\n\nThis agent still uses sample data for its actions, so things like prices and times are made up."
-          : ""),
-    );
+  async function publish() {
+    const ok = await askConfirm({
+      title: `Make version ${head.version} live?`,
+      body: "New calls will use it. Calls already in progress aren't affected.",
+      note: usesSampleData
+        ? "This agent still uses sample data for its actions, so things like prices and times are made up."
+        : undefined,
+      confirmLabel: "Make it live",
+    });
     if (!ok) return;
     setMessage(null);
     setPending("publish");
@@ -171,15 +173,29 @@ export function Editor({ agent, initial, latest, published, notice }: Props) {
               {published ? <span className="chip chip-live">Live: version {published.version}</span> : <span className="chip">Not live yet</span>}
             </p>
             <div className="-ml-3 mt-1 flex flex-wrap items-center">
-              <Link href={`/agents/${agent.id}/versions`} onClick={leaveGuard} className="btn btn-quiet underline underline-offset-4">Version history</Link>
-              <Link href={`/agents/${agent.id}/talk`} onClick={leaveGuard} className="btn btn-quiet underline underline-offset-4">Test call</Link>
-              <Link href={`/agents/${agent.id}/embed`} onClick={leaveGuard} className="btn btn-quiet underline underline-offset-4">Put on website</Link>
-              <Link href={`/calls?agent=${agent.id}`} onClick={leaveGuard} className="btn btn-quiet underline underline-offset-4">Past calls</Link>
+              <Link href={`/agents/${agent.id}/versions`} onClick={leave(`/agents/${agent.id}/versions`)} className="btn btn-quiet underline underline-offset-4">Version history</Link>
+              <Link href={`/agents/${agent.id}/talk`} onClick={leave(`/agents/${agent.id}/talk`)} className="btn btn-quiet underline underline-offset-4">Test call</Link>
+              <Link href={`/agents/${agent.id}/embed`} onClick={leave(`/agents/${agent.id}/embed`)} className="btn btn-quiet underline underline-offset-4">Put on website</Link>
+              <Link href={`/calls?agent=${agent.id}`} onClick={leave(`/calls?agent=${agent.id}`)} className="btn btn-quiet underline underline-offset-4">Past calls</Link>
               <form
                 className="ml-2"
                 action={duplicateAgent}
                 onSubmit={(e) => {
-                  if (dirty && !window.confirm("Copy the last saved version? Your unsaved changes won't be included.")) e.preventDefault();
+                  if (!dirty || skipCopyAsk.current) {
+                    skipCopyAsk.current = false;
+                    return;
+                  }
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  void askConfirm({
+                    title: "Copy the last saved version?",
+                    body: "Your unsaved changes won't be included in the copy.",
+                    confirmLabel: "Make the copy",
+                  }).then((ok) => {
+                    if (!ok) return;
+                    skipCopyAsk.current = true;
+                    form.requestSubmit();
+                  });
                 }}
               >
                 <input type="hidden" name="agent_id" value={agent.id} />

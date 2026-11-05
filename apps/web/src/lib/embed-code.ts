@@ -31,8 +31,13 @@ export function parseSites(text: string): { sites: string[]; bad: string[] } {
   return { sites, bad };
 }
 
-/** The header that decides which pages may show the embed in a frame. */
+/**
+ * The header that decides which pages may show the embed in a frame. An empty list means the
+ * owner left the sites blank, so any website may show it. A list that has entries but none valid
+ * shows it nowhere.
+ */
 export function frameAncestors(origins: string[]): string {
+  if (origins.length === 0) return "frame-ancestors *";
   const ok = origins.filter((o) => SITE.test(o));
   return `frame-ancestors ${ok.length ? ok.join(" ") : "'none'"}`;
 }

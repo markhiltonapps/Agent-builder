@@ -70,13 +70,19 @@ export function EmbedForm({
           hint="Off by default. Switch it off at any time to stop all website calls." />
 
         <div>
-          <label htmlFor={sitesId} className="mb-1 block text-sm font-medium">Websites allowed to show it</label>
+          <label htmlFor={sitesId} className="mb-1 block text-sm font-medium">Websites allowed to show it (optional)</label>
           <textarea id={sitesId} className="field min-h-24" value={sites} onChange={(e) => setSites(e.target.value)}
-            placeholder={"example.com\nwww.example.com"} aria-describedby={`${sitesId}-h`} spellCheck={false} />
+            placeholder={"Leave blank to allow any website"} aria-describedby={`${sitesId}-h`} spellCheck={false} />
           <p id={`${sitesId}-h`} className="hint mt-1">
-            One per line. Only these sites can show the button. Use <code>*.example.com</code> to include all of a
-            site&apos;s subdomains.
+            Leave this blank and your agent can be placed on any website. To lock it to your own site, list it here,
+            one per line. Use <code>*.example.com</code> to include all of a site&apos;s subdomains.
           </p>
+          {!sites.trim() && enabled && (
+            <p className="mt-2 rounded-2xl border border-warn/40 bg-warn/10 p-3 text-xs" role="note">
+              Any website can show this agent. That is easiest, but anyone could copy your code onto their page. The
+              daily limit below keeps your bill safe.
+            </p>
+          )}
         </div>
 
         <div>

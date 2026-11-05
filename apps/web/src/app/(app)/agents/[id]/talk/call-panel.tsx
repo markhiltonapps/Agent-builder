@@ -2,6 +2,7 @@
 
 import { Room, RoomEvent, Track, type Participant } from "livekit-client";
 import Link from "next/link";
+import { useStickyScroll } from "@/lib/use-sticky-scroll";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { startCall } from "@/app/actions";
 
@@ -25,6 +26,7 @@ export function CallPanel({
   const room = useRef<Room | null>(null);
   const waitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioEls = useRef<HTMLMediaElement[]>([]);
+  const { ref: transcriptRef, onScroll: onTranscriptScroll } = useStickyScroll<HTMLUListElement>(lines);
   const endRef = useRef<HTMLButtonElement>(null);
 
   const cleanup = useCallback(() => {
@@ -175,7 +177,7 @@ export function CallPanel({
       <p role="alert" className="text-sm text-danger empty:sr-only">{error ?? ""}</p>
 
       {lines.length > 0 && (
-        <ul className="max-h-96 space-y-2 overflow-y-auto rounded-2xl border border-line p-4" aria-label="Transcript">
+        <ul ref={transcriptRef} onScroll={onTranscriptScroll} className="max-h-96 space-y-2 overflow-y-auto rounded-2xl border border-line p-4" aria-label="Transcript">
           {lines.map((l) => (
             <li key={l.id} className={`text-sm ${l.final ? "" : "opacity-70"}`}>
               <span className={`mr-2 font-medium ${l.who === "agent" ? "text-accent" : "text-muted"}`}>

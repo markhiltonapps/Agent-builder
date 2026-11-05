@@ -1,6 +1,7 @@
 import "server-only";
 import { AccessToken, RoomAgentDispatch, RoomConfiguration, SipClient } from "livekit-server-sdk";
 import { WORKER_NAME } from "./livekit";
+import { matchesDigits, niceness, type Where } from "./number-match";
 
 // LiveKit Phone Numbers: search, rent, assign and release US numbers for inbound calls.
 // https://docs.livekit.io/reference/telephony/phone-numbers-api/
@@ -41,12 +42,25 @@ interface RawNumber {
 
 export const MAX_NUMBERS = Number(process.env.MAX_PHONE_NUMBERS ?? 3);
 
-export async function search(areaCode: string): Promise<AvailableNumber[]> {
-  const data = await twirp<{ items?: RawNumber[] }>("SearchPhoneNumbers", { country_code: "US", area_code: areaCode, limit: 10 });
-  return (data.items ?? []).map((n) => ({
-    e164: n.e164_format, area: n.area_code ?? areaCode,
-    place: [titleCase(n.locality), n.region].filter(Boolean).join(", "),
-  }));
+/** How many available numbers to ask LiveKit for per area code when looking for particular digits. */
+const BATCH = 500;
+
+export async function search(areaCodes: string[], digits = "", where: Where = "anywhere"): Promise<{ numbers: AvailableNumber[]; looked: number }> {
+  const batches = await Promise.all(
+    areaCodes.map((area) =>
+      twirp<{ items?: RawNumber[] }>("SearchPhoneNumbers", { country_code: "US", area_code: area, limit: digits ? BATCH : 10 }).then((d) =>
+        (d.items ?? []).map((n) => ({
+          e164: n.e164_format, area: n.area_code ?? area,
+          place: [titleCase(n.locality), n.region].filter(Boolean).join(", "),
+        })),
+      ),
+    ),
+  );
+  const all = [...new Map(batches.flat().map((n) => [n.e164, n])).values()];
+  const matches = all.filter((n) => matchesDigits(n.e164, digits, where));
+  // Nicest first: the longest repeated run, so 7777 comes before 7-1-7.
+  if (digits) matches.sort((a, b) => niceness(b.e164) - niceness(a.e164));
+  return { numbers: matches.slice(0, 12), looked: all.length };
 }
 
 const titleCase = (s?: string) => (s ?? "").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
