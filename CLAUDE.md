@@ -26,3 +26,9 @@ and password resets, and bounced mail can get email sending restricted for the w
 What enforces this in the code: a "Before User Created" auth hook rejects anything not on
 `public.signup_allowlist` before an email is sent; the sign-up form checks the address first
 (`apps/web/src/lib/signup-guard.ts`); test scripts must import `apps/web/scripts/test-guard.mjs`.
+
+Where email comes from: Supabase Auth sends through Resend (custom SMTP, `smtp.resend.com`) from
+`no-reply@mail.neatoventures.com`. The domain `mail.neatoventures.com` is verified in Resend with SPF and DKIM
+(DNS at GoDaddy). The "Before User Created" hook is switched on in Supabase (Authentication, Auth Hooks). Users
+added from the Supabase dashboard (Add user) may skip that hook, so they are not a way to test it. No separate
+test project exists yet (about $10 a month); the owner chose to skip it until automated sign-up tests are needed.
