@@ -1,12 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { compileConfig, draftConfig, reviseConfig } from "@/lib/builder-api";
 import { pushCard } from "@/lib/directory";
-import { MAX_SITES, parseSites } from "@/lib/embed-code";
+import { MAX_SITES, makeLimiter, parseSites } from "@/lib/embed-code";
+import { checkSignupEmail, refusalMessage } from "@/lib/signup-guard";
 import { forgetEmbedInfo } from "@/lib/embed-info";
 import { logoKind, logoProblem } from "@/lib/embed-logo";
 import { importVotelAgent, listVotelBookables, type VotelBookable } from "@/lib/votel-import";
@@ -32,6 +33,10 @@ export async function signIn(_: FormState, form: FormData): Promise<FormState> {
   redirect("/");
 }
 
+// Every sign-up call sends a real email, so there are few of them: per visitor and in total, per hour.
+const signUpPerVisitor = makeLimiter(4, 60 * 60_000);
+const signUpAll = makeLimiter(30, 60 * 60_000);
+
 export async function signUp(_: FormState, form: FormData): Promise<FormState> {
   // Sign-up is closed unless ALLOW_SIGNUP=true. The database also restricts who can create a
   // workspace (signup_allowlist), so this is a convenience layer, not the only lock.
@@ -42,8 +47,16 @@ export async function signUp(_: FormState, form: FormData): Promise<FormState> {
   if (password.length < 8) {
     return { error: "Use at least 8 characters for the password.", email: text(form, "email") };
   }
+  // Check the address before Supabase sees it (format, a domain that can receive mail, not a test
+  // domain) and limit how often it can happen. Never retried: a failure here is shown, not repeated.
+  const visitor = ((await headers()).get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+  if (!signUpAll("all") || !signUpPerVisitor(visitor)) {
+    return { error: "Too many sign-up attempts. Please wait an hour and try again.", email: text(form, "email") };
+  }
+  const checked = await checkSignupEmail(text(form, "email"));
+  if (!checked.ok) return { error: refusalMessage(checked.reason), email: text(form, "email") };
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.auth.signUp({ email: text(form, "email"), password });
+  const { data, error } = await supabase.auth.signUp({ email: checked.email, password });
   if (error) {
     const limited = error.status === 429 || /rate limit/i.test(error.message);
     return {
