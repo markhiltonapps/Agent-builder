@@ -85,7 +85,8 @@ async def _gemini(query: str, location: str, key: str, base: str, timeout_s: flo
                         last = f"{model}: HTTP {r.status}"
                         continue  # this model is not available here; try the next
                     if r.status >= 300:
-                        raise SearchError(f"Gemini said HTTP {r.status}")
+                        detail = (await r.text())[:160].replace("\n", " ")
+                        raise SearchError(f"Gemini said HTTP {r.status}: {detail}")
                     data = await r.json()
             except (aiohttp.ClientError, TimeoutError) as e:
                 raise SearchError(f"Gemini unreachable: {e}") from e
@@ -109,20 +110,28 @@ async def _openai(query: str, location: str, key: str, base: str, timeout_s: flo
         "instructions": STYLE,
         "input": _prompt(query, location),
         "tools": [{"type": "web_search"}],
-        "max_output_tokens": 600,
+        "max_output_tokens": 2500,  # a reasoning model spends part of this thinking before it writes
+        "reasoning": {"effort": "low"},
     }
-    try:
-        async with (
-            aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout_s)) as http,
-            http.post(
-                f"{base}/responses", json=body, headers={"Authorization": f"Bearer {key}"}
-            ) as r,
-        ):
-            if r.status >= 300:
-                raise SearchError(f"OpenAI said HTTP {r.status}")
-            data = await r.json()
-    except (aiohttp.ClientError, TimeoutError) as e:
-        raise SearchError(f"OpenAI unreachable: {e}") from e
+    data: dict[str, Any] = {}
+    for attempt in (0, 1):
+        try:
+            async with (
+                aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout_s)) as http,
+                http.post(
+                    f"{base}/responses", json=body, headers={"Authorization": f"Bearer {key}"}
+                ) as r,
+            ):
+                if r.status == 400 and attempt == 0 and "reasoning" in body:
+                    body.pop("reasoning")  # a model that does not take reasoning settings
+                    continue
+                if r.status >= 300:
+                    detail = (await r.text())[:160].replace("\n", " ")
+                    raise SearchError(f"OpenAI said HTTP {r.status}: {detail}")
+                data = await r.json()
+                break
+        except (aiohttp.ClientError, TimeoutError) as e:
+            raise SearchError(f"OpenAI unreachable: {e}") from e
     texts, titles = [], []
     for item in data.get("output") or []:
         if isinstance(item, dict) and item.get("type") == "message":
@@ -134,7 +143,8 @@ async def _openai(query: str, location: str, key: str, base: str, timeout_s: flo
                             titles.append(str(a["title"]).strip())
     text = _clean(" ".join(texts))
     if not text:
-        raise SearchError("OpenAI returned no answer")
+        kinds = [str(i.get("type")) for i in data.get("output") or [] if isinstance(i, dict)]
+        raise SearchError(f"OpenAI returned no answer (status {data.get('status')}, items {kinds})")
     return WebAnswer(text, list(dict.fromkeys(titles))[:3], "openai")
 
 

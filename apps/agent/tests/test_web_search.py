@@ -234,3 +234,52 @@ def test_the_setting_is_validated():
                 "adapters": {"demo_x": {"kind": "mock"}},
             }
         )
+
+
+async def test_openai_is_asked_again_without_reasoning_if_the_model_does_not_take_it(fake):
+    seen = []
+
+    async def picky(request: web.Request) -> web.Response:
+        body = await request.json()
+        seen.append("reasoning" in body)
+        if "reasoning" in body:
+            return web.Response(status=400, text="unsupported")
+        return web.json_response(
+            {
+                "output": [
+                    {"type": "message", "content": [{"type": "output_text", "text": "Found it."}]}
+                ]
+            }
+        )
+
+    app = web.Application()
+    app.router.add_post("/responses", picky)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    base = f"http://127.0.0.1:{site._server.sockets[0].getsockname()[1]}"
+    try:
+        a = await search_web("golf", "Houston", gemini_key="", openai_key="o", openai_base=base)
+    finally:
+        await runner.cleanup()
+    assert a.text == "Found it." and seen == [True, False]
+
+
+async def test_an_answerless_reply_says_why(fake):
+    fake.openai = {
+        "status": "incomplete",
+        "output": [{"type": "reasoning"}, {"type": "web_search_call"}],
+    }
+    with pytest.raises(SearchError, match="incomplete.*web_search_call"):
+        await search_web(
+            "golf", "Houston", gemini_key="", openai_key="o", openai_base=fake.base + "/o"
+        )
+
+
+async def test_a_google_refusal_keeps_what_google_said(fake):
+    fake.gemini["gemini-3.1-flash-lite"] = 429
+    with pytest.raises(SearchError, match="429"):
+        await search_web(
+            "golf", "Houston", gemini_key="g", openai_key="", gemini_base=fake.base + "/g"
+        )
