@@ -1,6 +1,6 @@
-# Holiday Hotel, Port Marlow
+# Holiday Hotel, Houston
 
-Holiday Hotel is a friendly 120-room hotel at 400 Harbor View Drive in Port Marlow, a small coastal town. It opened in 2019 and the lobby was renovated in 2024. The beach is a four-minute walk away and the Old Town shops and restaurants are a short stroll.
+Holiday Hotel is a friendly 120-room hotel in Houston, Texas. It opened in 2019 and the lobby was renovated in 2024.
 
 ## The front desk
 
@@ -20,4 +20,4 @@ Holiday Rewards is free to join at check-in. Members earn 10 points for every do
 
 ## Where we are
 
-The hotel is 0.2 miles from Marlow Beach, 0.4 miles from the pier and boardwalk, and 0.7 miles from Old Town. Marlow Regional Airport (MRL) is 14 miles away, about 25 minutes by car.
+The hotel is in Houston, Texas. For restaurants, attractions, golf and directions in the area, the agent looks them up on the web.

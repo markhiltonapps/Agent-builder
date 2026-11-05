@@ -195,6 +195,17 @@ class CalendarBooking(_Strict):
     duration_minutes: Annotated[int, Field(ge=5, le=480)] = 60
 
 
+class WebSearch(_Strict):
+    """Let the agent look things up on the web (places nearby, events, directions), the way a person would
+    search. It is for questions the business's own information does not answer."""
+
+    enabled: bool = False
+    location: Annotated[str, Field(max_length=120)] = ""
+    """Where the business is, so "near the hotel" means the right place."""
+    max_per_call: Annotated[int, Field(ge=1, le=6)] = 3
+    """The most searches one call or chat may make."""
+
+
 class AgentConfig(_Strict):
     schema_version: Literal[1] = SCHEMA_VERSION
     persona: Persona
@@ -207,6 +218,7 @@ class AgentConfig(_Strict):
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
     booking: BookingLink | None = None
     calendar: CalendarBooking | None = None
+    web_search: WebSearch | None = None
 
     @model_validator(mode="after")
     def _tools_bind_to_known_adapters(self) -> AgentConfig:
@@ -220,6 +232,8 @@ class AgentConfig(_Strict):
             "take_message",
             "send_booking_link",
             "request_appointment",
+            "search_web",
+            "search_knowledge",
         } & set(names)
         if reserved:
             raise ValueError(f"reserved built-in tool name(s): {', '.join(sorted(reserved))}")

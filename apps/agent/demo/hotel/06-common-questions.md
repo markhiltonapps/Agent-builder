@@ -14,11 +14,11 @@ Yes, one dog under 40 pounds per room, for a one-time $50 fee. Service animals s
 
 ## Do you have rooms for a honeymoon or an anniversary?
 
-Yes. The Deluxe King with Balcony has an ocean view and a soaking tub, and the Penthouse Suite has a terrace and a jetted tub. A celebration package of champagne or sparkling cider, chocolate-covered strawberries and a handwritten card is $45 and can be added to any stay.
+Yes. The Deluxe King with Balcony has a city view and a soaking tub, and the Penthouse Suite has a terrace and a jetted tub. A celebration package of champagne or sparkling cider, chocolate-covered strawberries and a handwritten card is $45 and can be added to any stay.
 
 ## What is good for a family with young children?
 
-The Family Suite sleeps six with two bedrooms and a kitchenette. Cribs are free and children under 12 stay free. The beach, the splash park, the aquarium and mini golf are all close.
+The Family Suite sleeps six with two bedrooms and a kitchenette. Cribs are free and children under 12 stay free. The agent can look up family activities in Houston.
 
 ## I am arriving late at night. Is that a problem?
 
@@ -28,13 +28,13 @@ No. The front desk is open 24 hours a day. Tell the team the arrival time so the
 
 Early check-in from 12 noon and late check-out until 1 pm are free. The front desk holds luggage at no charge.
 
-## How far is the beach?
+## What is there to do nearby?
 
-Marlow Beach is 0.2 miles, a four-minute walk. The hotel lends chairs, umbrellas and towels.
+The agent looks up the area on the web: restaurants, golf, attractions and events in Houston.
 
 ## Is the hotel good for business travel?
 
-Yes. Every room has a desk and free wifi, there is a business center with printing in the lobby, and the airport is 25 minutes away.
+Yes. Every room has a desk and free wifi, there is a business center with printing in the lobby, and the hotel shuttle serves both Houston airports.
 
 ## Do you have a pool or gym?
 

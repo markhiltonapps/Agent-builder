@@ -42,7 +42,7 @@ const sectionOf = (path: string): SectionKey => {
   if (head === "greetings") return "greetings";
   if (head === "guardrails") return "rules";
   if (head === "escalation") return "handoffs";
-  if (head === "tools" || head === "adapters" || head === "booking" || head === "calendar") return "actions";
+  if (head === "tools" || head === "adapters" || head === "booking" || head === "calendar" || head === "web_search") return "actions";
   if (head === "policy") return "flows";
   if (head === "runtime") return "voice";
   return "advanced";
@@ -424,6 +424,7 @@ function ActionsSection({ config, set, issues }: SectionProps) {
       </ul>
       <BookingCard config={config} set={set} issues={issues} />
       <CalendarCard config={config} set={set} issues={issues} />
+      <WebSearchCard config={config} set={set} issues={issues} />
       {adapterNames.length > 0 && (
         <fieldset className="space-y-3">
           <legend className="label">Connections</legend>
@@ -436,6 +437,40 @@ function ActionsSection({ config, set, issues }: SectionProps) {
         </fieldset>
       )}
     </>
+  );
+}
+
+/** Let the agent look things up on the web, like a Google search, for questions the business's own information does not cover. */
+function WebSearchCard({ config, set, issues }: SectionProps) {
+  const w = config.web_search;
+  return (
+    <div className="space-y-3 rounded-2xl border border-line bg-black/20 p-4">
+      <Toggle
+        label="Let the agent look things up on the web"
+        hint="For things you haven't written down, such as golf courses nearby, restaurants, directions or events. It says where the answer came from and that hours and prices can change. It never uses the web for your own prices, bookings or policies."
+        checked={Boolean(w?.enabled)}
+        onChange={(on) => set("web_search", { enabled: on, location: w?.location ?? "", max_per_call: w?.max_per_call ?? 3 })}
+      />
+      {w?.enabled && (
+        <>
+          <TextField
+            label="Where the business is" value={w.location} path="web_search.location" issues={issues} maxLength={120}
+            placeholder="Houston, Texas"
+            onChange={(v) => set("web_search", { ...w, location: v })}
+            hint="The city or area, so “near the hotel” or “nearby” means the right place."
+          />
+          <NumberField
+            label="Most searches in one call" value={w.max_per_call} min={1} max={6}
+            path="web_search.max_per_call" issues={issues}
+            onChange={(v) => set("web_search", { ...w, max_per_call: v })}
+          />
+          <p className="text-xs text-muted">
+            Each search takes a few seconds, and the agent says “let me look that up” first. Searches are Google&apos;s, and you can see
+            each one in the call&apos;s record under what the agent did.
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 

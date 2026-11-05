@@ -311,6 +311,19 @@ export default function HelpPage() {
           requests in Votel under Calendars.
         </Tip>
 
+        <H id="websearch">Let the agent look things up on the web</H>
+        <P>
+          Under the agent&apos;s <B>Actions</B>, switch on <B>Let the agent look things up on the web</B> and type where the business is (for
+          example <B>Houston, Texas</B>). The agent can then answer things you haven&apos;t written down, such as &ldquo;is there a golf course
+          nearby?&rdquo;, the way a person would search Google. It says &ldquo;let me look that up&rdquo;, answers in a sentence or two, says
+          where the answer came from, and reminds the caller that hours and prices on the web can change.
+        </P>
+        <Tip>
+          It never uses the web for your own prices, availability, policies or bookings: it answers those from your Knowledge
+          and its own tools. A call can make up to three searches (you can change that). Each search is in the call&apos;s record under
+          <B> What the agent did</B>, so you can see exactly what it looked up. It costs about a cent or less per search.
+        </Tip>
+
         <H id="results">See how it&apos;s doing</H>
         <P>
           The <B>Dashboard</B> shows calls, how many reached their goal, how many were handed to a person, average length,

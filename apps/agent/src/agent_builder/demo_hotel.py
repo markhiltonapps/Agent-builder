@@ -1,6 +1,6 @@
 """The demonstration hotel: the settings, tools, conversation rules and sample reservations that turn an
-agent into "Holiday Hotel" in Port Marlow, a made-up coastal town, with a booking system that is also made up
-(``adapters/hotel_demo.py``). Everything here is fiction, so nothing it says is wrong about the real world.
+agent into "Holiday Hotel" in Houston, Texas, a made-up hotel with a booking system that is also made up
+(``adapters/hotel_demo.py``). The hotel and its booking system are fiction; the area (restaurants, golf, directions) is looked up on the real web.
 
 ``build_config(base)`` returns a full agent configuration from an existing one (keeping its voice and
 settings). The documents the agent answers from live in ``demo/hotel/*.md`` and are uploaded under Knowledge.
@@ -39,7 +39,7 @@ ROOMS: list[dict[str, Any]] = [
         "max_guests": 2,
         "base_rate": 199,
         "count": 20,
-        "details": "Private balcony with an ocean view, sitting area, soaking tub, free wifi",
+        "details": "Private balcony with a city view, sitting area, soaking tub, free wifi",
     },
     {
         "type": "Family Suite",
@@ -56,7 +56,7 @@ ROOMS: list[dict[str, Any]] = [
         "base_rate": 449,
         "count": 1,
         "weekend_surcharge": 60,
-        "details": "Top floor, wraparound terrace, panoramic ocean views, jetted tub, separate living room",
+        "details": "Top floor, wraparound terrace, panoramic city views, jetted tub, separate living room",
     },
 ]
 
@@ -96,7 +96,7 @@ SERVICES: dict[str, dict[str, Any]] = {
         "per": "guest",
         "status": "confirmed",
         "needs": "the flight number and arrival time",
-        "note": "The shuttle meets guests at the Marlow Regional Airport shuttle bay and runs every 30 minutes from 5 am to 11 pm.",
+        "note": "The hotel shuttle serves both Houston airports, Bush Intercontinental and Hobby, by reservation; the front desk confirms the pickup time.",
     },
     "crib": {
         "fee": 0,
@@ -113,7 +113,7 @@ SERVICES: dict[str, dict[str, Any]] = {
         "fee": 0,
         "status": "confirmed",
         "needs": "the time and the number of people",
-        "note": "A table at the Harbor Grill, seating from 5 pm to 9:30 pm. Hotel guests get a complimentary dessert.",
+        "note": "A table at the Holiday Grill, seating from 5 pm to 9:30 pm. Hotel guests get a complimentary dessert.",
     },
     "celebration_package": {
         "fee": 45,
@@ -171,7 +171,7 @@ def base_options() -> dict[str, Any]:
         "rooms": ROOMS,
         "holiday_surcharges": HOLIDAYS,
         "sold_out": [
-            {"from": "2026-11-20", "to": "2026-11-22", "reason": "the Port Marlow Marathon weekend"}
+            {"from": "2026-11-20", "to": "2026-11-22", "reason": "a large convention in town"}
         ],
         "min_stay": [{"includes": "2026-12-31", "nights": 2, "reason": "New Year's Eve"}],
         "promos": {
@@ -410,7 +410,7 @@ Extras for a stay (early check-in, late check-out, airport shuttle, crib, extra 
 1. Find the reservation, collect the details the service needs, and call request_service. Tell them the fee, if any, and that it is added to the balance at check-in.
 
 Questions about the hotel or the area:
-1. Answer from the knowledge base: rooms, amenities, policies, restaurants, the beach, things to do, getting around. Give distances and walking or driving times. If it is not in the knowledge base, say you are not sure and offer to take a message. After answering, ask if they would like to book.
+1. Answer questions about the hotel (rooms, amenities, policies, dining) from the knowledge base. For anything about the area, such as restaurants, golf, attractions, shopping, directions, events, the weather or the airports, say you will look it up and use search_web. If neither has the answer, say you are not sure and offer to take a message. After answering, ask if they would like to book.
 
 Take a message or a request:
 1. Find out what they need. Ask for their first name, then last name, and confirm the best number. Ask for an email if they want one.
@@ -430,7 +430,7 @@ GUARDRAILS = [
     "Say a room is available, and what it costs, only from check_room_availability. Never work out rates or totals yourself; read the amounts the tool gives.",
     "A room is booked only after book_room succeeds. Never say it is booked, or give a confirmation number, before that.",
     "Take card details only for the deposit, through charge_card. Say only the last four digits back. Never write a card number anywhere else.",
-    "Answer questions about the hotel and the area from the knowledge base. If it is not there, say you are not sure and offer to take a message. Never make up facts.",
+    "Answer hotel questions from the knowledge base and area questions with search_web. If you have neither, say you are not sure and offer to take a message. Never make up facts.",
     "Never give out another guest's details. For an existing reservation you need the confirmation number and the last name on it.",
     "Never promise an upgrade, a refund or a rate the tools did not give you. Refunds follow the cancellation policy the tool reports.",
     "Never say a request outside the tools (an event, a group, a complaint) is arranged; take a message and say the team will follow up.",
@@ -479,9 +479,10 @@ def build_config(base: dict[str, Any]) -> dict[str, Any]:
     cfg["policy"] = {**cfg["policy"], "backend_flows": FLOWS, "speaking_rules": SPEAKING_RULES}
     cfg["guardrails"] = list(GUARDRAILS)
     cfg["escalation"] = copy.deepcopy(ESCALATION)
+    cfg["web_search"] = {"enabled": True, "location": "Houston, Texas", "max_per_call": 3}
     cfg["persona"] = {
         **cfg["persona"],
-        "business_description": "Holiday Hotel is a friendly 120-room hotel in Port Marlow, a small coastal town, a five-minute walk from the beach.",
+        "business_description": "Holiday Hotel is a friendly 120-room hotel in Houston, Texas.",
         "bot_disclosure": "I'm {agent_name}, a virtual assistant for {business}. I can answer questions, check rooms and book your stay.",
     }
     return cfg

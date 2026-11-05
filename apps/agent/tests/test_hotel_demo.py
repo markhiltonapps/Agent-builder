@@ -98,7 +98,7 @@ async def test_an_event_weekend_sells_out_and_a_holiday_costs_more():
         {"check_in": "2026-11-20", "check_out": "2026-11-22", "guests": 2},
     )
     assert q["bookable"] is False and all(r["availability"] == "sold out" for r in q["rooms"])
-    assert "Marathon" in q["notices"][0]
+    assert "convention" in q["notices"][0]
     xmas = await hotel().call(
         "check_room_availability",
         {

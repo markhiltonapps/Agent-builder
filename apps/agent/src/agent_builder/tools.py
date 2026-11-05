@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
@@ -17,10 +17,11 @@ from livekit.agents.llm import RawFunctionTool
 
 from .adapters import Adapter, ToolFailed, build_adapter
 from .compiler import CompiledAgent
-from .config import AgentConfig, BookingLink, CalendarBooking, ToolDefinition
+from .config import AgentConfig, BookingLink, CalendarBooking, ToolDefinition, WebSearch
 from .redact import redact_data
 from .votel import VotelError, call_tool, votel_config
 from .votel_sync import normalize_phone
+from .web_search import SearchError, WebAnswer, search_web
 
 log = logging.getLogger("agent_builder.tools")
 
@@ -451,11 +452,82 @@ def _appointment_tool(
     )
 
 
+WebSearcher = Callable[[str, str], Awaitable[WebAnswer]]
+
+
+def _web_search_tool(
+    settings: WebSearch, recorder: CallRecorder, searcher: WebSearcher | None = None
+) -> RawFunctionTool:
+    """Built in, when the agent may use the web: look something up and say what was found."""
+    run = searcher or search_web
+    used = {"n": 0}
+
+    async def handler(raw_arguments: dict[str, object], context: RunContext) -> str:
+        query = " ".join(str(raw_arguments.get("query") or "").split())[:200]
+        if not query:
+            raise ToolError("search_web needs a few words to look up.")
+        if used["n"] >= settings.max_per_call:
+            raise ToolError(
+                "You have searched as many times as this call allows. Say you cannot look up more right now "
+                "and offer to take a message."
+            )
+        used["n"] += 1
+        started = time.perf_counter()
+        try:
+            answer = await run(query, settings.location)
+        except SearchError as e:
+            log.warning("web search failed: %s", e)
+            recorder.calls.append(
+                ToolCallRecord(
+                    "search_web", {"query": query}, False, {"error": str(e)[:200]}, 0, False
+                )
+            )
+            raise ToolError(
+                "The web search is not working just now. Say you cannot look that up right now and offer to take a message."
+            ) from e
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        recorder.calls.append(
+            ToolCallRecord(
+                "search_web",
+                {"query": query},
+                True,
+                {"answer": answer.text[:300], "sources": answer.sources, "engine": answer.engine},
+                latency_ms,
+                False,
+            )
+        )
+        sources = f"\nSources: {', '.join(answer.sources)}." if answer.sources else ""
+        return f"{answer.text}{sources}\nSay where this came from, and that hours and prices can change."
+
+    return function_tool(
+        handler,
+        raw_schema={
+            "name": "search_web",
+            "description": (
+                "Search the web, like Google, for things the business's own information does not cover: places "
+                "nearby, directions, events, other places' hours, the weather. Use a short, specific question."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "What to look up, such as 'golf courses near the hotel'.",
+                    }
+                },
+                "required": ["query"],
+                "additionalProperties": False,
+            },
+        },
+    )
+
+
 def build_tools(
     cfg: AgentConfig,
     compiled: CompiledAgent,
     recorder: CallRecorder,
     caller: Callable[[], str | None] | None = None,
+    web_searcher: WebSearcher | None = None,
 ) -> tuple[list[Any], dict[str, Adapter]]:
     """Return the LiveKit tools for one call and the adapters backing them.
 
@@ -473,4 +545,6 @@ def build_tools(
         tools.append(_booking_tool(cfg.booking, cfg, recorder, caller or (lambda: None)))
     if cfg.calendar:
         tools.append(_appointment_tool(cfg.calendar, cfg, recorder, caller or (lambda: None)))
+    if cfg.web_search and cfg.web_search.enabled:
+        tools.append(_web_search_tool(cfg.web_search, recorder, web_searcher))
     return tools, adapters
