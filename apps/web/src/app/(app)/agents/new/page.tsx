@@ -14,9 +14,7 @@ export default async function NewAgentPage({ searchParams }: PageProps<"/agents/
   if (!accounts?.length) redirect("/agents");
 
   const pill = (active: boolean) =>
-    `rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
-      active ? "bg-white/10 text-text" : "text-muted hover:text-text"
-    }`;
+    `nav-pill px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-accent ${active ? "" : "text-muted hover:text-text"}`;
 
   return (
     <section aria-labelledby="new-h" className="mx-auto max-w-6xl space-y-5">

@@ -8,7 +8,7 @@ export function ChangeList({ changes, technical = false }: { changes: Change[]; 
   return (
     <ul className="space-y-3">
       {changes.map((c) => (
-        <li key={`${c.path}-${c.kind}`} className="rounded-lg border border-line p-3 text-sm">
+        <li key={`${c.path}-${c.kind}`} className="rounded-2xl border border-line p-3 text-sm">
           <span className="text-xs font-medium text-muted">{labelFor(c.path)}</span>
           {technical && <code className="ml-2 font-mono text-xs text-faint">{c.path}</code>}
           {c.kind !== "added" && (

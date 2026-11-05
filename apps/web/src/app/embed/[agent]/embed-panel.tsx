@@ -159,7 +159,7 @@ export function EmbedPanel({ agentId, title }: { agentId: string; title: string 
       <p role="alert" className="text-sm text-danger empty:sr-only">{error ?? ""}</p>
 
       {lines.length > 0 && (
-        <ul className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-line p-3" aria-label="Conversation so far">
+        <ul className="max-h-48 space-y-2 overflow-y-auto rounded-2xl border border-line p-3" aria-label="Conversation so far">
           {lines.map((l) => (
             <li key={l.id} className="text-sm">
               <span className={`mr-2 font-medium ${l.who === "agent" ? "text-accent" : "text-muted"}`}>

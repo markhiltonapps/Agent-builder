@@ -135,7 +135,7 @@ export function CallPanel({
   return (
     <div className="glass space-y-5 p-6">
       {stale && (
-        <p className="rounded-lg border border-warn/40 bg-warn/10 p-3 text-sm" role="note">
+        <p className="rounded-2xl border border-warn/40 bg-warn/10 p-3 text-sm" role="note">
           Your latest changes (version {savedVersion}) are saved but not live. This call uses version {liveVersion}.{" "}
           <Link href={`/agents/${agentId}`} className="link">Publish version {savedVersion}</Link> to test them.
         </p>
@@ -175,7 +175,7 @@ export function CallPanel({
       <p role="alert" className="text-sm text-danger empty:sr-only">{error ?? ""}</p>
 
       {lines.length > 0 && (
-        <ul className="max-h-96 space-y-2 overflow-y-auto rounded-lg border border-line p-4" aria-label="Transcript">
+        <ul className="max-h-96 space-y-2 overflow-y-auto rounded-2xl border border-line p-4" aria-label="Transcript">
           {lines.map((l) => (
             <li key={l.id} className={`text-sm ${l.final ? "" : "opacity-70"}`}>
               <span className={`mr-2 font-medium ${l.who === "agent" ? "text-accent" : "text-muted"}`}>

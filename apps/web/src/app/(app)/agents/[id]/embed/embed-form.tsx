@@ -13,7 +13,7 @@ function CopyBox({ title, hint, code }: { title: string; hint: string; code: str
     <div className="space-y-2">
       <h3 id={id} className="font-medium">{title}</h3>
       <p className="text-sm text-muted">{hint}</p>
-      <pre aria-labelledby={id} tabIndex={0} className="overflow-x-auto rounded-lg border border-line bg-black/30 p-3 text-xs leading-relaxed whitespace-pre-wrap break-all">{code}</pre>
+      <pre aria-labelledby={id} tabIndex={0} className="overflow-x-auto rounded-2xl border border-line bg-black/30 p-3 text-xs leading-relaxed whitespace-pre-wrap break-all">{code}</pre>
       <button
         type="button"
         className="btn"
@@ -59,7 +59,7 @@ export function EmbedForm({
   return (
     <div className="space-y-6">
       {!published && (
-        <p className="rounded-lg border border-warn/40 bg-warn/10 p-3 text-sm" role="note">
+        <p className="rounded-2xl border border-warn/40 bg-warn/10 p-3 text-sm" role="note">
           This agent isn&apos;t published yet, so visitors would hear nothing. Calls on your website always use the
           published version. <Link href={`/agents/${agentId}`} className="link">Publish it first</Link>.
         </p>

@@ -33,9 +33,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
   const href = (d: number, customers: boolean) => `/dashboard?days=${d}${customers ? "&source=customers" : ""}`;
   const pill = (active: boolean) =>
-    `rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
-      active ? "bg-white/10 text-text" : "text-muted hover:text-text"
-    }`;
+    `nav-pill px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-accent ${active ? "" : "text-muted hover:text-text"}`;
 
   return (
     <section aria-labelledby="dash-h" className="mx-auto max-w-5xl space-y-6">
@@ -170,15 +168,19 @@ function Numbers({ s }: { s: DashboardStats }) {
       <section aria-labelledby="per-day-h" className="glass p-4">
         <h2 id="per-day-h" className="text-lg font-medium">Calls per day</h2>
         <div
-          className="mt-4 flex h-40 items-end gap-px"
+          className="mt-4 flex h-40 items-end gap-0.5 sm:gap-1"
           role="img"
           aria-label={`Bar chart of calls per day, ${shortDay(s.series[0].day)} to ${shortDay(s.series[s.series.length - 1].day)}. Busiest day had ${plural(peak, "call")}. The table below has every day.`}
         >
           {s.series.map((d) => (
-            <div key={d.day} className="flex h-full min-w-0 flex-1 items-end" title={`${shortDay(d.day)}: ${plural(d.calls, "call")}`}>
+            <div
+              key={d.day}
+              className="flex h-full min-w-0 flex-1 items-end rounded-full bg-white/[0.07] p-px shadow-[inset_0_1px_3px_rgb(0_0_0/0.4)]"
+              title={`${shortDay(d.day)}: ${plural(d.calls, "call")}`}
+            >
               <div
-                className={`w-full rounded-t-sm ${d.calls ? "bg-accent" : "bg-white/10"}`}
-                style={{ height: d.calls ? `${Math.max(4, (d.calls / peak) * 100)}%` : "2px" }}
+                className={`w-full rounded-full ${d.calls ? "bg-gradient-to-t from-[#3fc8b4] to-[#a6f7ea] shadow-[0_0_12px_-2px_rgb(110_231_211/0.55)]" : "bg-transparent"}`}
+                style={{ height: d.calls ? `${Math.max(6, (d.calls / peak) * 100)}%` : "0" }}
               />
             </div>
           ))}

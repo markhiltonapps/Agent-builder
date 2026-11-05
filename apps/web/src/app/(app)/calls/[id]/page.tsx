@@ -44,7 +44,7 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
       </div>
 
       {call.votel_error && (
-        <p role="note" className="rounded-lg border border-warn/40 bg-warn/10 p-3 text-sm">
+        <p role="note" className="rounded-2xl border border-warn/40 bg-warn/10 p-3 text-sm">
           We couldn&apos;t send this call to Votel. It is still saved here with its full transcript.
         </p>
       )}
@@ -72,7 +72,7 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
           <h2 className="mb-3 text-sm font-medium">What the agent did</h2>
           <ul className="space-y-3">
             {tools.map((t, i) => (
-              <li key={i} className="rounded-lg border border-line p-3 text-sm">
+              <li key={i} className="rounded-2xl border border-line p-3 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{friendlyName(t.tool)}</span>
                   <span className={`chip ${t.ok ? "chip-live" : ""}`}>{t.ok ? "Worked" : "Failed"}</span>

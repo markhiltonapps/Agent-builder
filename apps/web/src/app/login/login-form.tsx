@@ -11,7 +11,7 @@ export function LoginForm({ allowSignup }: { allowSignup: boolean }) {
   return (
     <div className="glass p-6">
       {allowSignup && (
-        <div role="group" aria-label="Choose what to do" className="mb-5 grid grid-cols-2 gap-1 rounded-lg bg-black/25 p-1">
+        <div role="group" aria-label="Choose what to do" className="mb-5 grid grid-cols-2 gap-1 rounded-full bg-black/25 p-1">
           {(
             [
               ["in", "Sign in"],
@@ -23,7 +23,7 @@ export function LoginForm({ allowSignup }: { allowSignup: boolean }) {
               type="button"
               aria-pressed={mode === m}
               onClick={() => setMode(m)}
-              className={`min-h-11 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
+              className={`min-h-11 rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
                 mode === m ? "bg-white/15 text-text" : "text-muted hover:text-text"
               }`}
             >

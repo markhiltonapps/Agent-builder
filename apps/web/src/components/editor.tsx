@@ -162,7 +162,7 @@ export function Editor({ agent, initial, latest, published, notice }: Props) {
 
   return (
     <div className="w-full min-w-0 space-y-4">
-      <div className="glass space-y-2 bg-[#0e0f16]/95 p-4 lg:sticky lg:top-14 lg:z-10">
+      <div className="glass space-y-2 p-4 lg:sticky lg:top-[5rem] lg:z-10">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-xl font-semibold tracking-tight">{agent.name}</h1>
@@ -194,7 +194,7 @@ export function Editor({ agent, initial, latest, published, notice }: Props) {
             )}
           </div>
           {/* On a phone this is a bar fixed to the bottom, so Save stays in reach however far you scroll. */}
-          <div className="fixed inset-x-0 bottom-0 z-20 flex flex-wrap gap-2 border-t border-line bg-[#0e0f16]/95 p-3 lg:static lg:z-auto lg:border-0 lg:bg-transparent lg:p-0">
+          <div className="fixed inset-x-0 bottom-0 z-20 flex flex-wrap gap-2 border-t border-line bg-[#0e0f16]/80 p-3 backdrop-blur-xl lg:static lg:z-auto lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
             <p className="order-first basis-full text-xs text-muted empty:hidden lg:hidden">{saveReason || publishReason}</p>
             <button className={`btn flex-1 lg:flex-none ${dirty ? "btn-primary" : ""}`} onClick={save} disabled={!dirty || busy || issues.length > 0}>
               {pending === "save" ? "Saving…" : "Save changes"}
@@ -640,7 +640,7 @@ function PreviewPane({ preview }: { preview: PreviewResult | null }) {
             <button
               key={k} id={`${base}-tab-${k}`} role="tab" aria-selected={tab === k} aria-controls={`${base}-panel`}
               tabIndex={tab === k ? 0 : -1} ref={(el) => { refs.current[k] = el; }} onClick={() => setTab(k)}
-              className={`min-h-11 whitespace-nowrap rounded-md px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-accent lg:min-h-0 lg:py-1.5 ${tab === k ? "bg-white/15 text-text" : "text-muted hover:bg-white/5"}`}
+              className={`min-h-11 whitespace-nowrap rounded-full px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-accent lg:min-h-0 lg:py-1.5 ${tab === k ? "bg-white/15 text-text" : "text-muted hover:bg-white/5"}`}
             >
               {label}
             </button>

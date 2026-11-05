@@ -36,7 +36,7 @@ export function NumbersPanel({ owned, agents }: { owned: Owned[]; agents: Agent[
         ) : (
           <ul className="space-y-3">
             {owned.map((n) => (
-              <li key={n.e164} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-3">
+              <li key={n.e164} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line p-3">
                 <div className="min-w-0">
                   <p className="font-medium tabular-nums">{formatNumber(n.e164)}</p>
                   <p className="text-sm text-muted">
@@ -97,7 +97,7 @@ export function NumbersPanel({ owned, agents }: { owned: Owned[]; agents: Agent[
                 </div>
                 <ul className="space-y-2" aria-label="Available numbers">
                   {state.results.map((r) => (
-                    <li key={r.e164} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-3">
+                    <li key={r.e164} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line p-3">
                       <span>
                         <span className="font-medium tabular-nums">{formatNumber(r.e164)}</span>
                         {r.place && <span className="ml-2 text-sm text-muted">{r.place}</span>}
