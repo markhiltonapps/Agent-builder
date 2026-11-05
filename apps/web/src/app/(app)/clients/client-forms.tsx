@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useId, useState, useTransition } from "react";
-import { addClient, addClientFromVotel, loadVotelClients, sendClientToVotel, setClientShare, unlinkClientFromVotel } from "@/app/actions";
+import { useActionState, useId, useRef, useState, useTransition } from "react";
+import { addClient, addClientFromVotel, loadVotelClients, removeClient, removeVotelContact, sendClientToVotel, setClientShare, unlinkClientFromVotel, type VotelRemoval } from "@/app/actions";
 import type { VotelClient } from "@/lib/votel-clients";
 import { askConfirm } from "@/lib/dialog";
 
@@ -67,6 +67,24 @@ export function VotelPicker() {
       setFound((f) => (f ? { ...f, clients: f.clients.filter((x) => x.id !== c.id) } : f));
     });
 
+  const drop = async (c: VotelClient, mode: "untag" | "delete") => {
+    const ok = await askConfirm(
+      mode === "delete"
+        ? { title: `Delete ${c.name} in Votel?`, body: "This deletes the contact in Votel. Votel keeps deleted contacts so they can be recovered, but they disappear from your lists.", confirmLabel: "Delete contact", tone: "danger" }
+        : { title: `Take ${c.name} off the client list?`, body: "This only removes the agent-builder-client tag in Votel. The contact and its history stay.", confirmLabel: "Remove tag" },
+    );
+    if (!ok) return;
+    start(async () => {
+      setError(null);
+      setBusy(c.id);
+      const r = await removeVotelContact(c.id, mode);
+      setBusy(null);
+      if (!r.ok) return setError(r.error);
+      setDone(mode === "delete" ? `${c.name} was deleted in Votel.` : `${c.name} is off the client list.`);
+      setFound((f) => (f ? { ...f, clients: f.clients.filter((x) => x.id !== c.id) } : f));
+    });
+  };
+
   return (
     <div className="space-y-3">
       <button type="button" className="btn" disabled={pending} onClick={check}>
@@ -81,7 +99,11 @@ export function VotelPicker() {
                   <span className="block truncate font-medium">{c.name}</span>
                   <span className="block truncate text-xs text-faint">{[c.email, c.phone].filter(Boolean).join(" · ") || "No email or phone"}</span>
                 </span>
-                <button type="button" className="btn" disabled={pending} onClick={() => add(c)}>{busy === c.id ? "Adding…" : "Add as client"}</button>
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <button type="button" className="btn" disabled={pending} onClick={() => add(c)}>{busy === c.id ? "Adding…" : "Add as client"}</button>
+                  <button type="button" className="btn btn-quiet" disabled={pending} onClick={() => drop(c, "untag")}>Remove tag</button>
+                  <button type="button" className="btn btn-quiet btn-danger" disabled={pending} onClick={() => drop(c, "delete")}>Delete in Votel</button>
+                </span>
               </li>
             ))}
           </ul>
@@ -169,6 +191,59 @@ export function ShareControl({ accountId, initialToken, appUrl }: { accountId: s
         </>
       )}
       <p role="alert" className="text-sm text-danger empty:sr-only">{error ?? ""}</p>
+    </div>
+  );
+}
+
+/** Remove a client for good, with a choice about its Votel contact and the client's name typed to confirm. */
+export function RemoveClient({ accountId, name, linked }: { accountId: string; name: string; linked: boolean }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [mode, setMode] = useState<VotelRemoval>("untag");
+  const [typed, setTyped] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const id = useId();
+  const matches = typed.trim().toLowerCase() === name.trim().toLowerCase();
+
+  const open = () => { setTyped(""); setError(null); ref.current?.showModal(); };
+  const close = () => ref.current?.close();
+  const go = () =>
+    start(async () => {
+      setError(null);
+      const r = await removeClient(accountId, linked ? mode : "keep", typed);
+      if (!r.ok) return setError(r.error);
+      close();
+    });
+
+  return (
+    <div className="border-t border-line pt-4">
+      <button type="button" className="btn btn-quiet btn-danger" onClick={open}>Remove client</button>
+      <dialog ref={ref} className="glass-dialog" aria-labelledby={`${id}-t`} onCancel={(e) => { if (pending) e.preventDefault(); }}>
+        <form className="glass space-y-4 p-6" onSubmit={(e) => { e.preventDefault(); if (matches && !pending) go(); }}>
+          <h2 id={`${id}-t`} className="text-lg font-semibold tracking-tight">Remove {name}?</h2>
+          <p className="text-sm text-muted">This permanently deletes the client here: its agents, calls and settings. It cannot be undone, so download its usage first if you need it for billing.</p>
+          {linked && (
+            <fieldset className="space-y-1">
+              <legend className="label">What about its contact in Votel?</legend>
+              {([["keep", "Leave it as it is"], ["untag", "Take off the agent-builder-client tag (keeps the contact and its history)"], ["delete", "Delete the contact in Votel (Votel can recover it)"]] as const).map(([v, label]) => (
+                <label key={v} className="flex cursor-pointer items-start gap-2 py-0.5 text-sm">
+                  <input type="radio" name={`${id}-votel`} value={v} checked={mode === v} onChange={() => setMode(v)} className="mt-0.5 size-4" />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </fieldset>
+          )}
+          <div>
+            <label className="label" htmlFor={`${id}-n`}>Type <strong>{name}</strong> to confirm</label>
+            <input id={`${id}-n`} className="field" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
+          </div>
+          <p role="alert" className="text-sm text-danger empty:sr-only">{error ?? ""}</p>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" className="btn" onClick={close} disabled={pending}>Cancel</button>
+            <button className="btn btn-danger" disabled={!matches || pending}>{pending ? "Removing…" : "Remove client"}</button>
+          </div>
+        </form>
+      </dialog>
     </div>
   );
 }

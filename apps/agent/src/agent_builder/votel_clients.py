@@ -173,3 +173,29 @@ async def note_call(
         )
     except VotelError:
         pass
+
+
+async def remove_client(cfg: VotelConfig, contact_id: str, mode: str) -> str:
+    """Take a client's contact out of the client list in Votel. Returns "done" or "gone".
+
+    ``mode`` is "untag" (remove the client tag, keep the contact and its history) or "delete"
+    (Votel's own delete, which it can recover). Only a contact that carries the client tag is
+    touched: this can never be used to delete an ordinary contact.
+    """
+    if mode not in ("untag", "delete"):
+        raise VotelError("mode must be untag or delete")
+    if not UUID.fullmatch(contact_id.strip()):
+        raise VotelError("not a Votel contact id")
+    try:
+        _, tagged = parse_contact(await call_tool(cfg, "get_contact", {"contact_id": contact_id}))
+    except VotelError as e:
+        if re.search(r"not found|no contact|does not exist", str(e), re.IGNORECASE):
+            return "gone"  # already deleted in Votel: nothing left to do
+        raise
+    if not tagged:
+        raise VotelError(f"that contact does not carry the {TAG} tag")
+    if mode == "delete":
+        await call_tool(cfg, "delete_contact", {"contact_id": contact_id})
+    else:
+        await call_tool(cfg, "remove_contact_tags", {"contact_id": contact_id, "tags": [TAG]})
+    return "done"

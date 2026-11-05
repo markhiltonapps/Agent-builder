@@ -267,6 +267,20 @@ async def votel_client_get(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "client": client.to_json()})
 
 
+async def votel_client_remove(request: web.Request) -> web.Response:
+    """POST {"contact_id", "mode": "untag" | "delete"} -> {"ok": true, "result": "done" | "gone"}."""
+    cfg = votel_config()
+    if cfg is None:
+        return web.json_response({"ok": False, "error": "Votel is not connected."}, status=503)
+    contact_id = (await _text(request, "contact_id", 64)).strip()
+    mode = (await _text(request, "mode", 10)).strip()
+    try:
+        result = await votel_clients.remove_client(cfg, contact_id, mode)
+    except VotelError as e:
+        return web.json_response({"ok": False, "error": str(e)[:200]}, status=502)
+    return web.json_response({"ok": True, "result": result})
+
+
 async def votel_client_push(request: web.Request) -> web.Response:
     """POST {"name", "email"?, "phone"?, "contact_id"?, "app_url"?} -> {"ok": true, "contact_id"}.
 
@@ -383,6 +397,7 @@ def make_app(secret: str, chat: ChatService | None = None) -> web.Application:
     app.router.add_get("/v1/votel/clients", votel_clients_list)
     app.router.add_post("/v1/votel/client", votel_client_get)
     app.router.add_post("/v1/votel/client-push", votel_client_push)
+    app.router.add_post("/v1/votel/client-remove", votel_client_remove)
     app.router.add_post("/v1/chat/start", chat_start)
     app.router.add_post("/v1/chat/send", chat_send)
     app.router.add_post("/v1/chat/end", chat_end)

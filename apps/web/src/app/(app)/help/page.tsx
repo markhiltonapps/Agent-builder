@@ -97,9 +97,21 @@ export default function HelpPage() {
           <li><B>What follows:</B> each client card shows <B>Linked to a Votel contact</B>. After that, a one-line note is added to that contact whenever one of the client&apos;s agents takes a call, and new agent cards on the Agent Builder OS board are attached to it.</li>
         </Steps>
         <Tip>
-          Nothing is ever deleted in Votel from here. <B>Unlink</B> on a card only stops the matching: the client stays here and the contact stays in Votel.
-          A Votel contact can belong to one client only.
+          <B>Unlink</B> on a card only stops the matching: the client stays here and the contact stays in Votel. A Votel
+          contact can belong to one client only.
         </Tip>
+        <P>
+          To remove a client for good, choose <B>Remove client</B> at the bottom of its card (you need at least two clients, and
+          you must be its owner). It deletes the client here: its agents, calls and settings, so download its usage first if you
+          need it for billing. You type the client&apos;s name to confirm, and if it is linked to Votel you choose what happens to
+          its contact: <B>leave it</B>, <B>take off the agent-builder-client tag</B> (the contact and its history stay), or
+          <B> delete it</B> (Votel keeps deleted contacts so they can be recovered). Nothing is removed here unless the Votel step succeeded.
+        </P>
+        <P>
+          In <B>Add from Votel</B>, each contact found also has <B>Remove tag</B> and <B>Delete in Votel</B>. These only ever act on
+          contacts that carry the agent-builder-client tag and are not a client here, so you can tidy up leftovers. Ordinary
+          contacts can never be removed this way.
+        </P>
 
         <H id="pick">Pick a ready-made agent</H>
         <P>

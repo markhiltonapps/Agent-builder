@@ -48,3 +48,9 @@ export async function pushVotelClient(o: { name: string; email?: string; phone?:
   });
   return r.ok ? { ok: true, contactId: String(r.body.contact_id) } : r;
 }
+
+/** Take a client's contact out of the client list in Votel: remove its tag, or delete it (Votel can recover that). */
+export async function removeVotelClient(contactId: string, mode: "untag" | "delete"): Promise<{ ok: true; result: string } | { ok: false; error: string }> {
+  const r = await builder("/v1/votel/client-remove", { body: { contact_id: contactId, mode } });
+  return r.ok ? { ok: true, result: String(r.body.result) } : r;
+}

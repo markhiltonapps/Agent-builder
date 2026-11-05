@@ -5,7 +5,7 @@ import { LocalTime } from "@/components/local-time";
 import { currentClient } from "@/lib/client";
 import { type DashboardStats } from "@/lib/dashboard";
 import { supabaseServer } from "@/lib/supabase/server";
-import { AddClientForm, ShareControl, VotelLink, VotelPicker } from "./client-forms";
+import { AddClientForm, RemoveClient, ShareControl, VotelLink, VotelPicker } from "./client-forms";
 
 export const metadata: Metadata = { title: "Clients" };
 
@@ -61,6 +61,7 @@ export default async function ClientsPage() {
                 <>
                   <VotelLink accountId={c.id} linked={linked.has(c.id)} />
                   <ShareControl accountId={c.id} initialToken={token.get(c.id) ?? null} appUrl={appUrl} />
+                  {clients.length > 1 && <RemoveClient accountId={c.id} name={c.name} linked={linked.has(c.id)} />}
                 </>
               ) : (
                 <p className="text-xs text-faint">Only the owner of a client can share its dashboard.</p>

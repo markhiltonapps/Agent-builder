@@ -10,7 +10,7 @@ import { MAX_SITES, parseSites } from "@/lib/embed-code";
 import { forgetEmbedInfo } from "@/lib/embed-info";
 import { logoKind, logoProblem } from "@/lib/embed-logo";
 import { importVotelAgent, listVotelBookables, type VotelBookable } from "@/lib/votel-import";
-import { getVotelClient, listVotelClients, pushVotelClient, type VotelClient } from "@/lib/votel-clients";
+import { getVotelClient, listVotelClients, pushVotelClient, removeVotelClient, type VotelClient } from "@/lib/votel-clients";
 import { callToken } from "@/lib/livekit";
 import type { Compiled, ValidationIssue } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -436,6 +436,45 @@ export async function unlinkClientFromVotel(accountId: string): Promise<{ ok: bo
   if (error) return { ok: false, error: "Only the owner of a client can change this." };
   revalidatePath("/clients");
   return { ok: true };
+}
+
+export type VotelRemoval = "keep" | "untag" | "delete";
+
+/**
+ * Remove a client: its workspace and everything in it. If it is linked to a Votel contact, the
+ * person chooses what happens there first. The name must be typed to confirm; nothing is deleted
+ * here until Votel has done what was asked, so a failure leaves everything as it was.
+ */
+export async function removeClient(accountId: string, votel: VotelRemoval, typedName: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await supabaseServer();
+  const { data: account } = await supabase.from("accounts").select("name, votel_contact_id").eq("id", accountId).maybeSingle();
+  if (!account) return { ok: false, error: "We couldn't find that client." };
+  if (typedName.trim().toLowerCase() !== String(account.name).trim().toLowerCase()) return { ok: false, error: "Type the client's name exactly to confirm." };
+  const { data: mine } = await supabase.from("account_members").select("account_id, role");
+  if (!(mine ?? []).some((m) => m.account_id === accountId && m.role === "owner")) return { ok: false, error: "Only the owner of a client can remove it." };
+  if ((mine ?? []).filter((m) => m.account_id !== accountId).length === 0) return { ok: false, error: "Keep at least one client. Add another before removing this one." };
+
+  if (account.votel_contact_id && votel !== "keep") {
+    const done = await removeVotelClient(account.votel_contact_id, votel);
+    if (!done.ok) return { ok: false, error: `${done.error} The client was not removed. Try again, or choose to keep the Votel contact.` };
+  }
+  const { error } = await supabase.rpc("delete_client", { p_account: accountId });
+  if (error) return { ok: false, error: error.code === "22023" ? "Keep at least one client. Add another before removing this one." : "We couldn't remove that client." };
+  const jar = await cookies();
+  if (jar.get("client")?.value === accountId) jar.delete("client");
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** In the "Add from Votel" list: take a tagged contact that is not a client here off the list, or delete it. */
+export async function removeVotelContact(contactId: string, mode: "untag" | "delete"): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await supabaseServer();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims) return { ok: false, error: "Your session ended. Sign in again to continue." };
+  const { data: linked } = await supabase.from("accounts").select("id").eq("votel_contact_id", contactId.toLowerCase()).maybeSingle();
+  if (linked) return { ok: false, error: "That contact is a client here. Use Remove client on its card." };
+  const r = await removeVotelClient(contactId, mode);
+  return r.ok ? { ok: true } : r;
 }
 
 export type ShareResult = { ok: true; token: string | null } | { ok: false; error: string };

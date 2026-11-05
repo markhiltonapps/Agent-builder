@@ -147,3 +147,51 @@ async def test_sending_a_client_again_reuses_its_tagged_contact(votel):
     v = votel(list_contacts=LISTING)
     assert await vc.push_client(CFG, name="  zz test client co ") == A
     assert [n for n, _ in v.calls] == ["list_contacts"]  # nothing created, nothing to tag again
+
+
+TAGGED = f"Contact: Acme\n  tags: agent-builder-client, vip\n  id: {A}"
+UNTAGGED = f"Contact: Somebody Else\n  tags: vip\n  id: {A}"
+
+
+async def test_removing_a_client_can_take_off_the_tag_and_keep_the_contact(votel):
+    v = votel(get_contact=TAGGED, remove_contact_tags="ok")
+    assert await vc.remove_client(CFG, A, "untag") == "done"
+    assert v.calls[-1] == (
+        "remove_contact_tags",
+        {"contact_id": A, "tags": ["agent-builder-client"]},
+    )
+    assert "delete_contact" not in [n for n, _ in v.calls]
+
+
+async def test_removing_a_client_can_delete_its_contact(votel):
+    v = votel(get_contact=TAGGED, delete_contact="ok")
+    assert await vc.remove_client(CFG, A, "delete") == "done"
+    assert v.calls[-1] == ("delete_contact", {"contact_id": A})
+
+
+async def test_an_ordinary_contact_can_never_be_removed_this_way(votel):
+    v = votel(get_contact=UNTAGGED, delete_contact="ok", remove_contact_tags="ok")
+    for mode in ("untag", "delete"):
+        with pytest.raises(VotelError, match="does not carry"):
+            await vc.remove_client(CFG, A, mode)
+    assert [n for n, _ in v.calls] == ["get_contact", "get_contact"]
+
+
+async def test_a_contact_already_gone_in_votel_is_fine(votel):
+    votel(get_contact=VotelError("get_contact: Error: contact not found"))
+    assert await vc.remove_client(CFG, A, "delete") == "gone"
+
+
+async def test_other_votel_errors_are_not_hidden(votel):
+    votel(get_contact=VotelError("get_contact: timed out"))
+    with pytest.raises(VotelError, match="timed out"):
+        await vc.remove_client(CFG, A, "delete")
+
+
+async def test_bad_mode_or_id_is_refused_before_asking_votel(votel):
+    v = votel()
+    with pytest.raises(VotelError):
+        await vc.remove_client(CFG, A, "purge")
+    with pytest.raises(VotelError):
+        await vc.remove_client(CFG, "../x", "delete")
+    assert v.calls == []
