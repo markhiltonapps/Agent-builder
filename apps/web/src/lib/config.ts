@@ -65,6 +65,29 @@ export interface AgentConfig {
   };
 }
 
+/**
+ * An agent as stored may leave out parts that have defaults (the builder fills them in when it
+ * reads the config). The editor needs them present, so fill them in the same way.
+ */
+export function withDefaults(stored: Partial<AgentConfig>): AgentConfig {
+  const c = stored as AgentConfig;
+  return {
+    ...c,
+    guardrails: c.guardrails ?? [],
+    escalation: c.escalation ?? [],
+    policy: { speaking_rules: "", backend_flows: "", interruption: "yield_immediately", backchannel: "light", ...(c.policy as Partial<AgentConfig["policy"]> | undefined) },
+    tools: c.tools ?? [],
+    adapters: c.adapters ?? {},
+    runtime: {
+      fallbacks: [],
+      max_call_seconds: 900,
+      silence_timeout_seconds: 15,
+      ...(c.runtime as Partial<AgentConfig["runtime"]> | undefined),
+      voice: { provider: "openai", model: "gpt-live-1", voice: "marin", ...(c.runtime?.voice as Partial<ModelSpec> | undefined) },
+    },
+  };
+}
+
 export interface ValidationIssue {
   path: string;
   message: string;
