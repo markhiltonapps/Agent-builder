@@ -95,11 +95,13 @@ export default function HelpPage() {
           If you use the client switcher in the top bar while editing an agent, you are taken to the new client&apos;s agents
           rather than left on the old client&apos;s agent.
         </P>
-        <Shot name="clients" height={1619} alt="The Clients page with three client cards linked to Votel, the client switcher in the top bar and the Add from Votel panel"
-          caption="1: switch client here. 2: a client linked to its Votel contact (below it, the private dashboard link: see Share with a client). 3: Add from Votel, which lists contacts carrying the agent-builder-client tag." />
+        <Shot name="clients" height={1000} alt="The Clients page: each client card lists its agents with an Edit button, quick links, and the client switcher in the top bar"
+          caption="1: Edit opens that client's agent for editing. 2: quick links for that client: all its agents, a new agent, its calls, its dashboard. 3: the client switcher in the top bar." />
         <P>
           Clients and Votel stay in step, in both directions, through one tag: <B>agent-builder-client</B>.
         </P>
+        <Shot name="clients-votel" height={420} alt="The Add a client form and the Add from Votel panel at the bottom of the Clients page"
+          caption="At the bottom of the Clients page: add a client here (and in Votel), or bring clients over from Votel with Add from Votel." />
         <Steps>
           <li><B>From Votel to here:</B> in Votel, open a contact and give it the tag <B>agent-builder-client</B>. Back here, choose <B>Check Votel for clients</B> (under <B>Add from Votel</B>) and then <B>Add as client</B>. It becomes a client with its own empty workspace. If the contact has a company name, that is the client&apos;s name.</li>
           <li><B>From here to Votel:</B> when you add a client, leave <B>Also add this client to Votel</B> ticked. A contact is created in Votel with the tag, or the existing one with the same email or phone is found and tagged. For a client you already had, choose <B>Send to Votel</B> on its card.</li>
