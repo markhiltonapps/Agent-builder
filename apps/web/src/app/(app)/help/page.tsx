@@ -87,6 +87,14 @@ export default function HelpPage() {
           Each client has its own agents, calls and numbers, so nothing gets mixed up. Open <B>Clients</B> in the top bar to
           see them all, add a new one, and switch between them. Once you have two or more, a switcher appears in the top bar.
         </P>
+        <P>
+          <B>To edit a client&apos;s agent:</B> on the client&apos;s card, find its agent under <B>Agents for</B> that client and
+          choose <B>Edit</B>. That switches you to the client and opens the agent. Choose <B>All agents</B> to see all of that
+          client&apos;s agents, <B>New agent</B> to add one, or <B>Calls</B> and <B>Dashboard</B> to see how it is doing. The
+          editor shows a <B>Client:</B> label under the agent&apos;s name, so you always know whose agent you are changing.
+          If you use the client switcher in the top bar while editing an agent, you are taken to the new client&apos;s agents
+          rather than left on the old client&apos;s agent.
+        </P>
         <Shot name="clients" height={1619} alt="The Clients page with three client cards linked to Votel, the client switcher in the top bar and the Add from Votel panel"
           caption="1: switch client here. 2: a client linked to its Votel contact (below it, the private dashboard link: see Share with a client). 3: Add from Votel, which lists contacts carrying the agent-builder-client tag." />
         <P>

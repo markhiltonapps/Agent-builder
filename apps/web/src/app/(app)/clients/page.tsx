@@ -18,7 +18,7 @@ export default async function ClientsPage() {
 
   const [{ data: members }, { data: agents }, { data: tokens }, ...stats] = await Promise.all([
     supabase.from("account_members").select("account_id, role"),
-    supabase.from("agents").select("account_id, published_version_id"),
+    supabase.from("agents").select("id, name, account_id, published_version_id, updated_at").order("updated_at", { ascending: false }),
     supabase.from("accounts").select("id, share_token, votel_contact_id"),
     ...clients.map((c) => supabase.rpc("dashboard_stats", { p_days: 30, p_account: c.id })),
   ]);
@@ -53,10 +53,39 @@ export default async function ClientsPage() {
                 <div><dt className="text-faint">Calls</dt><dd className="text-xl font-semibold tabular-nums">{s?.totals.calls ?? 0}</dd><dd className="text-xs text-muted">last 30 days</dd></div>
                 <div><dt className="text-faint">Your role</dt><dd className="text-xl font-semibold capitalize">{role.get(c.id) ?? "-"}</dd></div>
               </dl>
-              <form action={openClient} className="flex flex-wrap gap-2">
-                <input type="hidden" name="account_id" value={c.id} />
-                <button className="btn btn-primary">Open this client</button>
-              </form>
+
+              <div>
+                <h3 className="mb-2 text-sm font-medium">Agents for {c.name}</h3>
+                {mine.length ? (
+                  <ul className="space-y-1.5">
+                    {mine.map((a) => (
+                      <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line px-3 py-2">
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium">{a.name}</span>
+                          <span className="text-xs text-faint">{a.published_version_id ? "Live" : "Not live yet"}</span>
+                        </span>
+                        <form action={openClient}>
+                          <input type="hidden" name="account_id" value={c.id} />
+                          <input type="hidden" name="to" value={`/agents/${a.id}`} />
+                          <button className="btn btn-primary">Edit<span className="sr-only"> {a.name} for {c.name}</span></button>
+                        </form>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted">No agents yet.</p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {([["/agents", "All agents", true], ["/agents/new", "New agent", false], ["/calls", "Calls", false], ["/dashboard", "Dashboard", false]] as const).map(([to, label, primary]) => (
+                  <form key={to} action={openClient}>
+                    <input type="hidden" name="account_id" value={c.id} />
+                    <input type="hidden" name="to" value={to} />
+                    <button className={primary ? "btn btn-primary" : "btn"}>{label}<span className="sr-only"> for {c.name}</span></button>
+                  </form>
+                ))}
+              </div>
               {owner ? (
                 <>
                   <VotelLink accountId={c.id} linked={linked.has(c.id)} />

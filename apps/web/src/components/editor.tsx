@@ -30,6 +30,7 @@ type SectionKey = (typeof SECTIONS)[number][0];
 interface Props {
   notice?: string;
   agent: { id: string; name: string };
+  clientName?: string;
   initial: AgentConfig;
   latest: { id: string; version: number };
   published: { id: string; version: number } | null;
@@ -56,7 +57,7 @@ const adapterLabel = (n: string, kind: keyof typeof KIND_LABEL) => {
   return nice === KIND_LABEL[kind] ? nice : `${nice} (${KIND_LABEL[kind]})`;
 };
 
-export function Editor({ agent, initial, latest, published, notice }: Props) {
+export function Editor({ agent, clientName, initial, latest, published, notice }: Props) {
   const router = useRouter();
   const [config, setConfig] = useState<AgentConfig>(initial);
   const [saved, setSaved] = useState(JSON.stringify(initial));
@@ -169,6 +170,7 @@ export function Editor({ agent, initial, latest, published, notice }: Props) {
           <div className="min-w-0">
             <h1 className="truncate text-xl font-semibold tracking-tight">{agent.name}</h1>
             <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
+              {clientName && <span className="chip" title="The client this agent belongs to">Client: {clientName}</span>}
               <span className="chip">{dirty ? "Unsaved changes" : `Version ${head.version} saved`}</span>
               {published ? <span className="chip chip-live">Live: version {published.version}</span> : <span className="chip">Not live yet</span>}
             </p>

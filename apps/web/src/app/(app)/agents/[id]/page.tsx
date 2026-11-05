@@ -14,7 +14,7 @@ export default async function AgentPage({ params, searchParams }: PageProps<"/ag
 
   const { data: agent } = await supabase
     .from("agents")
-    .select("id, name, published_version_id")
+    .select("id, name, account_id, published_version_id")
     .eq("id", id)
     .maybeSingle();
   if (!agent) notFound();
@@ -43,6 +43,8 @@ export default async function AgentPage({ params, searchParams }: PageProps<"/ag
     );
   }
 
+  const { data: owner } = await supabase.from("accounts").select("name").eq("id", agent.account_id).maybeSingle();
+
   let published: { id: string; version: number } | null = null;
   if (agent.published_version_id) {
     const { data } = await supabase
@@ -57,6 +59,7 @@ export default async function AgentPage({ params, searchParams }: PageProps<"/ag
     <Editor
       notice={copied ? "Copy created. You're editing it now." : undefined}
       agent={{ id: agent.id, name: agent.name }}
+      clientName={owner?.name ?? ""}
       initial={withDefaults(latest.config as Partial<AgentConfig>)}
       latest={{ id: latest.id, version: latest.version }}
       published={published}
