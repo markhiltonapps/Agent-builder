@@ -48,6 +48,8 @@ _BASE_SPEAKING_RULES = """\
 class CompiledAgent:
     voice_instructions: str
     backend_instructions: str
+    combined_instructions: str
+    """Voice and backend instructions in one, for a model that does its own tool work (Gemini)."""
     opening_line: str
     goodbye_line: str
     still_there_line: str
@@ -175,6 +177,17 @@ def compile_agent(cfg: AgentConfig, now: datetime | None = None) -> CompiledAgen
         ),
     )
 
+    combined = _join(
+        voice,
+        _section("Backend flows", cfg.policy.backend_flows),
+        _section(
+            "Tool use",
+            "- Only state facts that a tool returned.\n"
+            "- If a tool fails, say you could not complete it and offer to take a message.\n"
+            "- Do not call the same tool twice with the same arguments.",
+        ),
+    )
+
     payload = json.dumps(
         {
             "voice": voice,
@@ -194,10 +207,12 @@ def compile_agent(cfg: AgentConfig, now: datetime | None = None) -> CompiledAgen
             f"{local:%-I:%M %p} local time. Work out dates like 'tomorrow' from this.",
         )
         voice, backend = _join(voice, today), _join(backend, today)
+        combined = _join(combined, today)
 
     return CompiledAgent(
         voice_instructions=voice,
         backend_instructions=backend,
+        combined_instructions=combined,
         opening_line=_fill(cfg.greetings.opening, cfg),
         goodbye_line=_fill(cfg.greetings.goodbye, cfg),
         still_there_line=_fill(cfg.greetings.still_there, cfg),

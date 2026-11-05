@@ -41,6 +41,7 @@ from .preflight import run as run_preflight
 from .providers import build_voice_model
 from .session_store import ConversationStore, SavedCall, Saver, store_from_env
 from .tools import CallRecorder, build_tools
+from .voice_failover import effective_models, health, model_key, next_after_failure, pick_start
 
 load_dotenv(ROOT / ".env")
 log = logging.getLogger("agent_builder")
@@ -77,8 +78,14 @@ class BuilderAgent(Agent):
         *,
         chat_ctx: ChatContext | None = None,
         resume_note: str | None = None,
+        single_model: bool = False,
     ) -> None:
-        super().__init__(instructions=compiled.voice_instructions, tools=tools, chat_ctx=chat_ctx)
+        # GPT-Live hands tool work to a backend model, so it gets the voice instructions only. A
+        # model that does its own tool work (Gemini) needs the backend flows as well.
+        instructions = (
+            compiled.combined_instructions if single_model else compiled.voice_instructions
+        )
+        super().__init__(instructions=instructions, tools=tools, chat_ctx=chat_ctx)
         self._compiled = compiled
         self._resume_note = resume_note
 
@@ -208,6 +215,13 @@ async def entrypoint(ctx: JobContext) -> None:
 
     saver = Saver(store, snapshot)
 
+    # Which voice model this call uses: the first healthy one, with the others as backups.
+    models = effective_models(cfg)
+    active = pick_start(models, health)
+    voice_used: dict = {"spec": models[active], "path": [model_key(models[active])]}
+    if active != 0:
+        log.warning("starting on %s: the primary voice looks down", model_key(models[active]))
+
     async def finish_call() -> None:
         try:
             await saver.flush()
@@ -224,7 +238,10 @@ async def entrypoint(ctx: JobContext) -> None:
             "agent_id": loaded.agent_id,
             "agent_version": loaded.version,
             "agent_version_id": loaded.version_id,
-            "voice_model": cfg.runtime.voice.model_dump(mode="json"),
+            "voice_model": {
+                **voice_used["spec"].model_dump(mode="json"),
+                **({"failover_path": voice_used["path"]} if len(voice_used["path"]) > 1 else {}),
+            },
             "started_at": started,
             "duration_s": round(time.time() - started, 1),
             "recoveries": recoveries,
@@ -256,9 +273,23 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.add_shutdown_callback(stop_limiter)
 
     restarts = 0
+    max_restarts = max(MAX_RESTARTS, len(models))
     while True:
+        spec = models[active]
+        voice_used["spec"] = spec
+        try:
+            model = build_voice_model(spec, compiled)
+        except Exception as e:  # a backup without a key, or a library problem
+            log.error("could not set up %s: %s", model_key(spec), e)
+            health.failure(model_key(spec))
+            restarts += 1
+            if len(models) == 1 or restarts > max_restarts:
+                raise
+            active = next_after_failure(models, active, health)
+            voice_used["path"].append(model_key(models[active]))
+            continue
         session = AgentSession(
-            llm=build_voice_model(cfg.runtime.voice, compiled),
+            llm=model,
             user_away_timeout=float(cfg.runtime.silence_timeout_seconds),
         )
         closed: asyncio.Future[CloseEvent] = asyncio.get_running_loop().create_future()
@@ -273,22 +304,43 @@ async def entrypoint(ctx: JobContext) -> None:
         current["session"] = session
 
         await session.start(
-            agent=BuilderAgent(compiled, tools, chat_ctx=chat_ctx, resume_note=resume_note),
+            agent=BuilderAgent(
+                compiled,
+                tools,
+                chat_ctx=chat_ctx,
+                resume_note=resume_note,
+                single_model=spec.provider == "google",
+            ),
             room=ctx.room,
         )
         ev = await closed
         snapshot()  # capture the final conversation of this session
         current["session"] = None
 
+        if ev.reason == CloseReason.ERROR:
+            health.failure(model_key(spec))
+        else:
+            health.success(model_key(spec))
+
         caller_here = bool(ctx.room.remote_participants)
-        if ev.reason != CloseReason.ERROR or not caller_here or restarts >= MAX_RESTARTS:
+        if ev.reason != CloseReason.ERROR or not caller_here or restarts >= max_restarts:
             if ev.reason == CloseReason.ERROR:
                 log.error("model session failed and could not be recovered: %s", ev.error)
             break
 
         restarts += 1
         recoveries += 1
-        log.warning("model session failed (%s); resuming, attempt %d", ev.error, restarts)
+        previous = model_key(spec)
+        if len(models) > 1:
+            active = next_after_failure(models, active, health)
+            voice_used["path"].append(model_key(models[active]))
+        log.warning(
+            "model session failed (%s); resuming on %s (was %s), attempt %d",
+            ev.error,
+            model_key(models[active]),
+            previous,
+            restarts,
+        )
         try:
             await saver.flush()
         except Exception:

@@ -122,16 +122,28 @@ class AdapterConfig(_Strict):
     """Kind-specific settings. ``mock``: ``{"seed": {...}}``. ``http``: base URL, mappings."""
 
 
+GOOGLE_MODEL = "gemini-3.1-flash-live-preview"
+GOOGLE_VOICE = "Puck"
+
+
 class ModelSpec(_Strict):
     """One voice model. No model id lives in code; it is always named here."""
 
-    provider: Literal["openai", "azure"] = "openai"
+    provider: Literal["openai", "azure", "google"] = "openai"
     model: ShortText = "gpt-live-1"
     voice: ShortText = "marin"
     backend_model: ShortText | None = None
     """Responses model that runs delegated tool work. Provider default when unset."""
     azure_deployment: ShortText | None = None
     azure_backend_deployment: ShortText | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _google_defaults(cls, data: Any) -> Any:
+        """A Gemini spec need not repeat OpenAI-shaped defaults: it gets its own model and voice."""
+        if isinstance(data, dict) and data.get("provider") == "google":
+            return {"model": GOOGLE_MODEL, "voice": GOOGLE_VOICE, **data}
+        return data
 
     @model_validator(mode="after")
     def _azure_needs_deployments(self) -> ModelSpec:

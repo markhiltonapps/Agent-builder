@@ -22,7 +22,7 @@ from typing import Any
 from aiohttp import web
 from pydantic import ValidationError
 
-from . import embed, votel_clients, votel_import
+from . import embed, voice_status, votel_clients, votel_import
 from .chat import ChatError, ChatService
 from .compiler import compile_agent
 from .config import AgentConfig
@@ -357,6 +357,11 @@ async def chat_end(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
+async def voice_status_(_request: web.Request) -> web.Response:
+    """GET -> whether the primary and backup voice providers answer right now."""
+    return web.json_response(await voice_status.check())
+
+
 async def schema(_request: web.Request) -> web.Response:
     return web.json_response(AgentConfig.model_json_schema())
 
@@ -401,6 +406,7 @@ def make_app(secret: str, chat: ChatService | None = None) -> web.Application:
     app.router.add_post("/v1/chat/start", chat_start)
     app.router.add_post("/v1/chat/send", chat_send)
     app.router.add_post("/v1/chat/end", chat_end)
+    app.router.add_get("/v1/voice/status", voice_status_)
     app.router.add_get("/v1/schema", schema)
     app.router.add_get("/healthz", healthz)
     return app

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { LocalTime } from "@/components/local-time";
+import { VoiceStatusLine } from "@/components/voice-status";
 import { currentClient } from "@/lib/client";
 import { supabaseServer } from "@/lib/supabase/server";
 import { CreateAccountForm, SyncVotelButton } from "./forms";
@@ -36,7 +38,7 @@ export default async function AgentsPage() {
       <section aria-labelledby="agents-h">
         <h1 id="agents-h" className="text-2xl font-semibold tracking-tight">Agents</h1>
         <p className="mt-1 text-sm text-muted">{account.name}</p>
-        <div className="mb-4 mt-3"><SyncVotelButton /></div>
+        <div className="mb-4 mt-3 space-y-2"><SyncVotelButton /><Suspense fallback={<p className="text-xs text-faint">Checking the voice service…</p>}><VoiceStatusLine /></Suspense></div>
         {agents?.length ? (
           <ul className="grid gap-3 sm:grid-cols-2">
             {agents.map((a) => {

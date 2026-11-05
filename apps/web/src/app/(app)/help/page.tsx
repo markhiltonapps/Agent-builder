@@ -18,6 +18,7 @@ const SECTIONS = [
   ["usage", "Usage and billing"],
   ["votel", "Votel: where to look"],
   ["cost", "What it costs"],
+  ["backup", "If the voice service goes down"],
   ["trouble", "If something looks wrong"],
 ] as const;
 
@@ -322,6 +323,19 @@ export default function HelpPage() {
         <P>
           Chat is typed, so there is no voice model and no line time. It uses a small, low-cost text model, which is why it
           costs a tiny fraction of a call. Offer chat next to talking, or on its own to keep costs lowest.
+        </P>
+
+        <H id="backup">If the voice service goes down</H>
+        <P>
+          Calls run on OpenAI&apos;s voice service. If it has an outage, the app can switch to a <B>backup voice from Google
+          (Gemini)</B> by itself. A new call starts on the backup if the main voice has been failing, and a call already in
+          progress is moved over with the conversation carried across, so the caller is not asked to start again. The backup
+          sounds a little different, and is used only when needed.
+        </P>
+        <P>
+          On the <B>Agents</B> page, the <B>Voice status</B> line shows whether each service is answering right now. Look at it
+          before a demo. It reads <B>Backup, Google Gemini Live: ready</B> when the backup is set up. If it says <B>No backup
+          voice set up yet</B>, the Google key hasn&apos;t been added to the server yet.
         </P>
 
         <H id="trouble">If something looks wrong</H>
