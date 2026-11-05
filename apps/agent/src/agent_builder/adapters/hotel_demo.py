@@ -4,8 +4,8 @@ Nothing here is real. It answers the way a hotel's booking system would, so an a
 reservation from the first question to a confirmation number:
 
   check_room_availability   rooms for the dates and party size, each with its rate, tax, total and the deposit
-  charge_card               takes the deposit with a TEST card only (anything else is refused, so a real card
-                            can never be used by accident); one test card is declined, to show that too
+  charge_card               pretends to take the deposit: any card number is approved (nothing is ever charged,
+                            and only the last four digits are kept); two test numbers are declined, to show that
   book_room                 books the room once its deposit has been charged, and returns a confirmation number
   lookup_reservation        finds a booking by confirmation number, or by last name and phone number
   modify_reservation        moves the dates or changes the room
@@ -77,6 +77,19 @@ def _hour(text: str) -> float | None:
     elif not mer and 1 <= hour <= 6:
         hour += 12
     return hour + minute / 60
+
+
+def _brand(number: str) -> str:
+    """The card brand a number's first digits suggest (a demonstration: nothing is checked with a bank)."""
+    if number.startswith("4"):
+        return "Visa"
+    if number[:2] in ("34", "37"):
+        return "Amex"
+    if number[:2] in ("36", "38", "30") or number.startswith("6"):
+        return "Discover"
+    if number[:2] in ("51", "52", "53", "54", "55") or 2221 <= int(number[:4] or 0) <= 2720:
+        return "Mastercard"
+    return "Card"
 
 
 def _digits(raw: Any) -> str:
@@ -428,14 +441,13 @@ class HotelDemoAdapter:
             raise ToolFailed("amount must be a number of dollars") from None
         if not Decimal(1) <= amount <= Decimal(5000):
             raise ToolFailed("amount must be between $1 and $5,000")
-        if number not in cards:
+        if not 13 <= len(number) <= 19:
             return {
                 "approved": False,
-                "reason": "not_a_test_card",
-                "message": "This is a demonstration line and it can only take the published test cards, never a real card. "
-                "Ask the caller to use a test card, for example 4242 4242 4242 4242 (Visa) with any future expiry and any 3-digit code.",
+                "reason": "invalid_card_number",
+                "message": "That card number is not the right length (cards have 13 to 19 digits). Ask the caller to say it again.",
             }
-        card = cards[number]
+        card = cards.get(number) or {"brand": _brand(number), "result": "approved"}
         brand = str(card["brand"])
         exp = _digits(a.get("expiry"))
         if len(exp) not in (4, 6):

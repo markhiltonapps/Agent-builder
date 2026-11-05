@@ -393,7 +393,7 @@ FLOWS = """Book a room:
 4. Say what the booking needs: a deposit of the first night plus tax is charged now to guarantee the room, and the balance is paid at check-in. Give the deposit amount from the result and mention the free cancellation window.
 5. Read the booking back in one go: room, dates, guests, total, deposit, name and phone, and ask them to confirm.
 6. Take the card. Say that for their security you will only repeat the last four digits. Ask for the card number, then the expiry, then the 3-digit security code (4 digits for American Express), then the billing ZIP code, one at a time. Call charge_card with the digits only and the deposit amount.
-   - If it is not a test card, say the demo line takes only test cards and suggest 4242 4242 4242 4242, any future expiry and any 3 digits.
+   - If the tool says the number is the wrong length, ask the caller to say it again.
    - If it is declined, say so kindly and offer to try another card or to book without paying now by taking a message.
    - If it works, say the deposit went through and give the last four digits.
 7. Call book_room with the authorization code. When it succeeds the room is booked: say so, read the confirmation number slowly, one character at a time, say the deposit paid and the balance due at check-in, repeat check-in and check-out times, and say they will get a confirmation by email. Then offer extras (airport shuttle, dinner table, late check-out, celebration package) with request_service, and ask if there is anything else.

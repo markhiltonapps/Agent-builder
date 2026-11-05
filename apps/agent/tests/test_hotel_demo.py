@@ -175,21 +175,19 @@ async def test_impossible_requests_say_what_is_wrong(args, message):
         await hotel().call("check_room_availability", args)
 
 
-async def test_only_test_cards_are_taken_and_a_real_looking_card_is_refused():
+async def test_any_card_number_is_approved_and_only_the_last_four_are_kept():
     h = hotel()
-    real = await h.call("charge_card", {**GOOD, "card_number": "4111111111111111", "amount": 100})
-    assert (
-        real["approved"] is False
-        and real["reason"] == "not_a_test_card"
-        and "4242" in real["message"]
+    other = await h.call(
+        "charge_card", {**GOOD, "card_number": "4111 1111 1111 1111", "amount": 100}
     )
+    assert other["approved"] is True and other["last4"] == "1111" and other["brand"] == "Visa"
+    odd = await h.call("charge_card", {**GOOD, "card_number": "1234 5678 9012 3456", "amount": 100})
+    assert odd["approved"] is True and odd["last4"] == "3456"
     ok = await h.call("charge_card", {**GOOD, "amount": 222.88})
-    assert (
-        ok["approved"] is True
-        and ok["last4"] == "4242"
-        and ok["authorization_code"].startswith("A")
-    )
-    assert "4242424242424242" not in str(ok)
+    assert ok["approved"] is True and ok["authorization_code"].startswith("A")
+    assert "4242424242424242" not in str(ok) and "4111111111111111" not in str(other)
+    short = await h.call("charge_card", {**GOOD, "card_number": "4242 4242", "amount": 100})
+    assert short["approved"] is False and short["reason"] == "invalid_card_number"
 
 
 async def test_the_declined_card_the_bad_expiry_and_the_wrong_code_are_each_explained():

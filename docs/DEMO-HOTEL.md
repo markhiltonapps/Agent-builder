@@ -14,10 +14,12 @@ charged, no email is sent.
    number and 50 phone minutes a month: upgrade to Ship before a customer demo.)
 4. Have a second device ready in case the phone line or the room Wi-Fi misbehaves.
 
-## Cards: test cards only
+## Cards: any number works
 
-The agent takes the deposit through a pretend payment step that accepts **only the published test cards**. Anything
-else, such as a real card, is refused and never kept. Say any future expiry and any 3 digits (4 for Amex):
+The agent takes the deposit through a pretend payment step. **Any card number of 13 to 19 digits is approved** (use
+any future expiry, any 3 digits, or 4 for Amex, and any 5-digit ZIP). Nothing is ever charged. Please still use a
+made-up number rather than your own card: it is spoken aloud and passes through the speech and AI services on the
+way. Only the last four digits are kept. These two numbers are declined on purpose, to show how a decline is handled:
 
 | Card | Number | Result |
 |---|---|---|
