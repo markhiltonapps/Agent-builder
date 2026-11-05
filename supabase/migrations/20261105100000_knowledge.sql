@@ -79,7 +79,7 @@ begin
     raise exception 'The document must be 1 to 200000 characters.' using errcode = '22023';
   end if;
   if jsonb_typeof(p_chunks) is distinct from 'array'
-     or jsonb_array_length(p_chunks) not between 1 and 400 then
+     or jsonb_array_length(p_chunks) not between 1 and 2000 then
     raise exception 'The document has no readable text.' using errcode = '22023';
   end if;
   if p_agent_ids is not null then
@@ -89,14 +89,14 @@ begin
 
   if p_doc is null then
     select count(*) into n from public.knowledge_docs where account_id = p_account;
-    if n >= 100 then
-      raise exception 'A client can keep up to 100 documents. Delete one first.' using errcode = '53400';
+    if n >= 500 then
+      raise exception 'A client can keep up to 500 documents. Delete some first.' using errcode = '53400';
     end if;
   end if;
   select coalesce(sum(length(content)), 0) into n from public.knowledge_docs
     where account_id = p_account and id is distinct from p_doc;
-  if n + length(p_content) > 3000000 then
-    raise exception 'That would take this client past its limit of about 3 MB of documents.' using errcode = '53400';
+  if n + length(p_content) > 20000000 then
+    raise exception 'That would take this client past its limit of about 20 MB of documents.' using errcode = '53400';
   end if;
 
   if p_doc is null then
@@ -146,32 +146,50 @@ language sql stable security definer set search_path = '' as $$
   ) from total;
 $$;
 
--- For the worker: the passages that best match what the caller asked. Any of the words may match
--- (the more of them, the higher it ranks), beginnings of words count, and common words are ignored.
+-- For the worker: the passages that best match what the caller asked. Beginnings of words count,
+-- common words (the, of, are) are ignored, and a passage scores by the words it matches, with
+-- rarer words worth more: a word that is in nearly every passage ("office") counts for little, a
+-- word in only one ("parrot") for a lot. So a passage with the rare word beats many with the common one.
 create or replace function public.knowledge_search(p_agent uuid, p_query text, p_limit integer default 4)
 returns table (title text, heading text, content text, rank real)
-language plpgsql stable security definer set search_path = '' as $$
-#variable_conflict use_column
-declare q tsquery;
-begin
-  select to_tsquery('english', string_agg(quote_literal(w) || ':*', ' | '))
-    into q
-    from (
-      select distinct w
-        from regexp_split_to_table(lower(left(coalesce(p_query, ''), 300)), '[^[:alnum:]]+') as w
-       where length(w) >= 2
-       limit 12
-    ) words;
-  if q is null then return; end if;
-  return query
-    select d.title, c.heading, c.content, ts_rank_cd(c.tsv, q)::real as rank
+language sql stable security definer set search_path = '' as $$
+  with words as (
+    select w, to_tsquery('english', quote_literal(w) || ':*') as q
+      from (
+        select distinct w
+          from regexp_split_to_table(lower(left(coalesce(p_query, ''), 300)), '[^[:alnum:]]+') as w
+         where length(w) >= 2
+         limit 12
+      ) distinct_words
+  ), any_word as (
+    select to_tsquery('english', string_agg(quote_literal(w) || ':*', ' | ')) as q from words
+  ), scoped as (
+    -- only passages that match at least one word (the index finds them); the rest cannot score
+    select c.id, c.idx, c.heading, c.content, c.tsv, d.title
       from public.knowledge_chunks c
       join public.knowledge_docs d on d.id = c.doc_id
       join public.agents a on a.account_id = d.account_id
-     where a.id = p_agent and (d.agent_ids is null or p_agent = any (d.agent_ids)) and c.tsv @@ q
-     order by rank desc, d.title, c.idx
-     limit greatest(least(coalesce(p_limit, 4), 8), 1);
-end;
+     where a.id = p_agent and (d.agent_ids is null or p_agent = any (d.agent_ids))
+       and c.tsv @@ (select q from any_word)
+  ), hits as (
+    select s.id, w.w from scoped s cross join words w where s.tsv @@ w.q
+  ), df as (
+    select w, count(*)::float8 as n from hits group by w
+  ), total as (
+    select greatest(count(*), 1)::float8 as n
+      from public.knowledge_chunks c
+      join public.knowledge_docs d on d.id = c.doc_id
+      join public.agents a on a.account_id = d.account_id
+     where a.id = p_agent and (d.agent_ids is null or p_agent = any (d.agent_ids))
+  ), scored as (
+    select h.id, sum(ln(1 + total.n / df.n)) as score
+      from hits h join df on df.w = h.w cross join total
+     group by h.id
+  )
+  select s.title, s.heading, s.content, sc.score::real as rank
+    from scored sc join scoped s on s.id = sc.id
+   order by sc.score desc, s.title, s.idx
+   limit greatest(least(coalesce(p_limit, 4), 8), 1);
 $$;
 
 revoke all on function public.knowledge_save(uuid, uuid, text, text, text, uuid[], jsonb) from public, anon;

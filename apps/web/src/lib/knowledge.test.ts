@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CHUNK_MAX, chunkMarkdown, decodeText, fileProblem, prepareDocument, prepareText, scopeLabel, sizeLabel, titleFor } from "./knowledge.ts";
+import { CHUNK_MAX, PART_CHARS, chunkMarkdown, decodeText, fileProblem, prepareDocument, prepareText, prepareUpload, scopeLabel, sizeLabel, splitDocument, titleFor } from "./knowledge.ts";
 
 const bytes = (s: string) => new TextEncoder().encode(s);
 
@@ -10,7 +10,8 @@ test("only small Markdown and text files are taken, with a reason in plain words
   assert.equal(fileProblem("faq.markdown", 100), null);
   assert.match(fileProblem("menu.pdf", 100) ?? "", /only Markdown/);
   assert.match(fileProblem("empty.md", 0) ?? "", /empty/);
-  assert.match(fileProblem("big.md", 300_000) ?? "", /up to 200 KB/);
+  assert.equal(fileProblem("long.md", 1_900_000), null);
+  assert.match(fileProblem("huge.md", 2_500_000) ?? "", /2\.5 MB\. A file can be up to 2 MB/);
 });
 
 test("text must be UTF-8; a byte-order mark and Windows line endings are tidied", () => {
@@ -99,4 +100,47 @@ test("who a document is for, in a few words", () => {
   assert.equal(sizeLabel(450), "450 characters");
   assert.equal(sizeLabel(3200), "3.2 KB");
   assert.equal(sizeLabel(45_000), "45 KB");
+});
+
+const page = (n: number, words = 400) => `# Page ${n}\n\n## About page ${n}\n\n${`word${n} `.repeat(words)}\n\n## Contact\n\nCall us about page ${n}.`;
+
+test("a short document stays one document", () => {
+  assert.deepEqual(splitDocument("Hours", "# Hours\n\nOpen."), [{ title: "Hours", content: "# Hours\n\nOpen." }]);
+});
+
+test("a scraped site with many pages is split at its page headings, every part whole and under the limit", () => {
+  const site = Array.from({ length: 100 }, (_, i) => page(i + 1, 700)).join("\n\n");
+  assert.ok(site.length > PART_CHARS * 2, "a big file");
+  const parts = splitDocument("Example site", site);
+  assert.ok(parts.length >= 3 && parts.length <= 8, `${parts.length} parts`);
+  parts.forEach((p, i) => {
+    assert.ok(p.content.length <= PART_CHARS, "under the limit");
+    assert.equal(p.title, `Example site (part ${i + 1} of ${parts.length})`);
+    assert.match(p.content, /^# Page \d+/, "starts at a page heading");
+  });
+  const pages = parts.flatMap((p) => p.content.match(/^# Page \d+/gm) ?? []);
+  assert.equal(pages.length, 100, "no page is lost or cut in two");
+  assert.deepEqual(pages, Array.from({ length: 100 }, (_, i) => `# Page ${i + 1}`), "in order");
+});
+
+test("one huge section is cut at its sub-headings, and text with no headings at all is still cut", () => {
+  const sub = Array.from({ length: 60 }, (_, i) => `## Item ${i}\n\n${"x ".repeat(2500)}`).join("\n\n");
+  const a = splitDocument("Big", `# One section\n\n${sub}`);
+  assert.ok(a.length > 1 && a.every((p) => p.content.length <= PART_CHARS));
+  const flat = splitDocument("Flat", `${"A sentence of plain text. ".repeat(20000)}`);
+  assert.ok(flat.length > 1 && flat.every((p) => p.content.length <= PART_CHARS));
+  assert.equal(flat.map((p) => p.content).join(" ").split(/\s+/).length, 20000 * 5, "nothing is lost");
+});
+
+test("an uploaded long file becomes several documents; a short one stays one", () => {
+  const long = prepareUpload("site.md", bytes(`---\ntitle: Example site\n---\n${Array.from({ length: 100 }, (_, i) => page(i + 1)).join("\n\n")}`));
+  assert.equal(long.ok, true);
+  if (long.ok) {
+    assert.ok(long.docs.length > 1);
+    assert.match(long.docs[0].title, /^Example site \(part 1 of \d+\)$/);
+    assert.ok(long.docs.every((d) => d.filename === "site.md" && d.chunks.length > 0 && d.chunks.length <= 2000));
+    assert.ok(!long.docs[0].content.startsWith("---"), "front matter is not carried into the first part");
+  }
+  const short = prepareUpload("hours.md", bytes("# Hours\n\nOpen 8 to 5."));
+  assert.equal(short.ok && short.docs.length, 1);
 });

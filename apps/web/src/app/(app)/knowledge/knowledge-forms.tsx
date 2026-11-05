@@ -31,7 +31,7 @@ export function UploadBox({ accountId }: { accountId: string }) {
         const body = new FormData();
         body.set("file", f);
         const r = await uploadKnowledgeFile(accountId, body).catch(() => ({ ok: false as const, error: "We couldn't reach the server. Try again." }));
-        done.push(r.ok ? { name: f.name, ok: true, message: `Added “${r.title}”.` } : { name: f.name, ok: false, message: r.error });
+        done.push(r.ok ? { name: f.name, ok: true, message: r.count > 1 ? `Added ${r.count} documents from ${f.name}, starting with “${r.title}”.` : `Added “${r.title}”.` } : { name: f.name, ok: false, message: r.error });
       }
       setResults([...done]);
     }
@@ -48,7 +48,7 @@ export function UploadBox({ accountId }: { accountId: string }) {
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); void add(Array.from(e.dataTransfer.files)); }}
       >
-        <p className="text-sm text-muted">Drop Markdown (.md) or text (.txt) files here, or choose them. Up to 200 KB each.</p>
+        <p className="text-sm text-muted">Drop Markdown (.md) or text (.txt) files here, or choose them. Up to 2 MB each. A long file is split into parts for you, at its headings.</p>
         <label htmlFor={id} className="btn btn-primary cursor-pointer">{busy ? "Adding…" : "Choose files"}</label>
         <input
           ref={input}

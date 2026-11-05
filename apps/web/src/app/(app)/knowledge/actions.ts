@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prepareDocument, prepareText } from "@/lib/knowledge";
+import { prepareText, prepareUpload } from "@/lib/knowledge";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export type SaveResult = { ok: true; id: string; title: string } | { ok: false; error: string };
+export type UploadResult = { ok: true; title: string; count: number } | { ok: false; error: string };
 export type Done = { ok: true } | { ok: false; error: string };
 
 /** The database's own messages for limits and bad input are already written for people. */
@@ -34,13 +35,21 @@ async function save(accountId: string, docId: string | null, p: { title: string;
   return { ok: true, id: data, title: p.title };
 }
 
-/** One uploaded file (the page sends them one at a time, so one bad file never stops the others). */
-export async function uploadKnowledgeFile(accountId: string, form: FormData): Promise<SaveResult> {
+/** One uploaded file: one document, or several when it is long (the page sends files one at a time, so one bad file never stops the others). */
+export async function uploadKnowledgeFile(accountId: string, form: FormData): Promise<UploadResult> {
   const file = form.get("file");
   if (!(file instanceof File)) return { ok: false, error: "Choose a file to add." };
-  const prepared = prepareDocument(file.name, new Uint8Array(await file.arrayBuffer()));
+  const prepared = prepareUpload(file.name, new Uint8Array(await file.arrayBuffer()));
   if (!prepared.ok) return prepared;
-  return save(accountId, null, prepared);
+  let first = "";
+  for (const [i, doc] of prepared.docs.entries()) {
+    const r = await save(accountId, null, doc);
+    if (!r.ok) {
+      return { ok: false, error: i === 0 ? r.error : `${file.name}: added ${i} of ${prepared.docs.length} parts, then stopped. ${r.error}` };
+    }
+    first ||= r.title;
+  }
+  return { ok: true, title: first, count: prepared.docs.length };
 }
 
 /** A document typed or pasted in the page: new when ``docId`` is null, otherwise a replacement. */

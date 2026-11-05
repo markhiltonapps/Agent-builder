@@ -175,8 +175,10 @@ export default function HelpPage() {
           services, policies and the answers to questions callers ask again and again. Each client has its own knowledge, so
           what you add for one client is never heard by another.
         </P>
+        <Shot name="knowledge" height={800} alt="The Knowledge page: a box to choose or drop files, a place to write a document, and a list of documents with who uses each"
+          caption="1: choose or drop files. 2: or write a document here. 3: a document; click it to read or change it. 4: which agents use it." />
         <Steps>
-          <li>Choose <B>Choose files</B>, or drop files onto the box. Markdown (<B>.md</B>) and plain text (<B>.txt</B>) both work, up to 200 KB each, and you can add several at once. Or open <B>Or write a document here</B> and type or paste it.</li>
+          <li>Choose <B>Choose files</B>, or drop files onto the box. Markdown (<B>.md</B>) and plain text (<B>.txt</B>) both work, up to 2 MB each, and you can add several at once. A long file, such as a whole website saved as one Markdown file, is split into parts for you at its headings (&ldquo;Example site (part 2 of 6)&rdquo;). Or open <B>Or write a document here</B> and type or paste it.</li>
           <li>Each document appears in the list, with its size and which agents use it. Click one to read or change its text.</li>
           <li>On a document&apos;s page, choose <B>Every agent for this client</B> or <B>Only the ones I choose</B>, then <B>Save changes</B>.</li>
         </Steps>
@@ -190,11 +192,17 @@ export default function HelpPage() {
           your documents, the agent says it doesn&apos;t have that information and offers to take a message, so it never makes
           something up.
         </Tip>
+        <Tip>
+          Adding a whole website? Save each page with its title as a <B>#</B> heading and keep only the useful text, leaving out menus,
+          footers and cookie notices, which repeat on every page and only get in the way. The agent finds the right page by the
+          words in the question, so pages with clear titles and the real names of your services work best. Read what comes up when you
+          test: if the agent misses something, add a short document that answers that question directly.
+        </Tip>
         <P>
           How it works: when a client&apos;s documents add up to about five pages or less, the agent is given all of them at the
           start of every call, so it answers straight away. When there is more than that, the agent looks things up while it
           talks, saying a short &ldquo;Let me check&rdquo; first, and uses only the parts that match the question. A client can keep up to
-          100 documents, about 3 MB in all.
+          500 documents, about 20 MB in all.
         </P>
 
         <H id="test">Test it</H>

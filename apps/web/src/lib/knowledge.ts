@@ -2,7 +2,9 @@
 // short passages an agent can search. Pure functions, so they can be tested without a browser or a
 // database. The database holds the result (see supabase/migrations/..._knowledge.sql).
 
-export const MAX_FILE_BYTES = 200_000;
+export const MAX_FILE_BYTES = 2_000_000;
+/** A file longer than this is stored as several documents, cut at headings, so none is unwieldy to read or edit. */
+export const PART_CHARS = 150_000;
 export const ALLOWED_EXTENSIONS = [".md", ".markdown", ".txt"] as const;
 /** A passage aims to be about this long, and never goes past the maximum (the database allows 4000). */
 export const CHUNK_TARGET = 900;
@@ -14,14 +16,14 @@ export interface PreparedDoc { title: string; filename: string; content: string;
 
 export type Prepared = ({ ok: true } & PreparedDoc) | { ok: false; error: string };
 
-const fileKb = (bytes: number) => `${Math.round(bytes / 1000)} KB`;
+const fileKb = (bytes: number) => (bytes >= 1_000_000 ? `${+(bytes / 1_000_000).toFixed(1)} MB` : `${Math.round(bytes / 1000)} KB`);
 
 /** Whether a file by this name and size can be taken, or why not, in words for the person. */
 export function fileProblem(name: string, size: number): string | null {
   const lower = name.toLowerCase();
   if (!ALLOWED_EXTENSIONS.some((e) => lower.endsWith(e))) return `${name}: only Markdown (.md) and plain text (.txt) files can be added.`;
   if (size === 0) return `${name} is empty.`;
-  if (size > MAX_FILE_BYTES) return `${name} is ${fileKb(size)}. A file can be up to ${fileKb(MAX_FILE_BYTES)}. Split it into smaller documents.`;
+  if (size > MAX_FILE_BYTES) return `${name} is ${fileKb(size)}. A file can be up to ${fileKb(MAX_FILE_BYTES)}. Split it into two or more files.`;
   return null;
 }
 
@@ -37,8 +39,10 @@ export function decodeText(bytes: Uint8Array): { ok: true; text: string } | { ok
   return { ok: true, text: text.replace(/^﻿/, "").replace(/\r\n?/g, "\n") };
 }
 
+const FRONT_MATTER = /^---\n([\s\S]*?)\n---[ \t]*(?:\n|$)/;
+
 function splitFrontMatter(text: string): { meta: Record<string, string>; body: string } {
-  const m = /^---\n([\s\S]*?)\n---[ \t]*(?:\n|$)/.exec(text);
+  const m = FRONT_MATTER.exec(text);
   if (!m) return { meta: {}, body: text };
   const meta: Record<string, string> = {};
   for (const line of m[1].split("\n")) {
@@ -126,13 +130,93 @@ export function chunkMarkdown(text: string): Chunk[] {
   return chunks;
 }
 
-/** Everything the database needs from an uploaded file, or what to tell the person is wrong with it. */
-export function prepareDocument(filename: string, bytes: Uint8Array): Prepared {
+const HEADING = (level: number) => new RegExp(`^#{${level}}\\s+\\S`);
+
+/** Cut text into the pieces that start at a heading of this level (not inside a code block). */
+function splitAtHeadings(text: string, level: number): string[] {
+  const out: string[] = [];
+  let current: string[] = [];
+  let fenced = false;
+  for (const line of text.split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+    if (!fenced && HEADING(level).test(line) && current.some((l) => l.trim())) {
+      out.push(current.join("\n"));
+      current = [];
+    }
+    current.push(line);
+  }
+  if (current.some((l) => l.trim())) out.push(current.join("\n"));
+  return out;
+}
+
+/** Last resort for text with no headings at all: cut at a blank line, else at a space. */
+function splitPlain(text: string): string[] {
+  const out: string[] = [];
+  let rest = text;
+  while (rest.length > PART_CHARS) {
+    const window = rest.slice(0, PART_CHARS);
+    const cut = Math.max(window.lastIndexOf("\n\n"), window.lastIndexOf("\n"), window.lastIndexOf(" "));
+    const at = cut > PART_CHARS / 3 ? cut : PART_CHARS;
+    out.push(rest.slice(0, at).trim());
+    rest = rest.slice(at).trim();
+  }
+  if (rest.trim()) out.push(rest.trim());
+  return out;
+}
+
+/** Pieces of at most PART_CHARS, cut at the biggest headings first (# then ## then ###), each piece whole. */
+function pieces(text: string, level = 1): string[] {
+  if (text.length <= PART_CHARS) return [text.trim()];
+  if (level > 3) return splitPlain(text);
+  const units = splitAtHeadings(text, level);
+  if (units.length < 2) return pieces(text, level + 1);
+  const out: string[] = [];
+  let current = "";
+  for (const unit of units.flatMap((u) => (u.length > PART_CHARS ? pieces(u, level + 1) : [u]))) {
+    if (current && current.length + unit.length + 2 > PART_CHARS) {
+      out.push(current.trim());
+      current = "";
+    }
+    current = current ? `${current}\n\n${unit}` : unit;
+  }
+  if (current.trim()) out.push(current.trim());
+  return out;
+}
+
+/** A long document as several, each under its own numbered title. A short one stays as it is. */
+export function splitDocument(title: string, text: string): Array<{ title: string; content: string }> {
+  const parts = pieces(text.trim());
+  if (parts.length <= 1) return [{ title, content: text.trim() }];
+  return parts.map((content, i) => {
+    const tail = ` (part ${i + 1} of ${parts.length})`;
+    return { title: `${title.slice(0, 200 - tail.length)}${tail}`, content };
+  });
+}
+
+export type PreparedUpload = { ok: true; docs: PreparedDoc[] } | { ok: false; error: string };
+
+/** Everything the database needs from an uploaded file: one document, or several if it is long. */
+export function prepareUpload(filename: string, bytes: Uint8Array): PreparedUpload {
   const problem = fileProblem(filename, bytes.byteLength);
   if (problem) return { ok: false, error: problem };
   const decoded = decodeText(bytes);
   if (!decoded.ok) return { ok: false, error: `${filename} is not a plain text file. Save it as Markdown or text (UTF-8) and try again.` };
-  return prepareText(titleFor(decoded.text, filename), filename, decoded.text);
+  const text = decoded.text;
+  // A long file's front matter would only ride along on the first part, so it is dropped (its title is kept).
+  const body = text.length > PART_CHARS ? text.replace(FRONT_MATTER, "") : text;
+  const docs: PreparedDoc[] = [];
+  for (const part of splitDocument(titleFor(text, filename), body)) {
+    const prepared = prepareText(part.title, filename, part.content);
+    if (!prepared.ok) return { ok: false, error: `${filename}: ${prepared.error}` };
+    docs.push(prepared);
+  }
+  return { ok: true, docs };
+}
+
+/** One document from a file's bytes (kept for short files and tests). */
+export function prepareDocument(filename: string, bytes: Uint8Array): Prepared {
+  const r = prepareUpload(filename, bytes);
+  return r.ok ? { ok: true, ...r.docs[0] } : r;
 }
 
 /** The same for text typed or edited in the page. */
@@ -144,7 +228,7 @@ export function prepareText(title: string, filename: string, text: string): Prep
   if (content.length > 200_000) return { ok: false, error: "That is too long for one document. Split it into smaller ones." };
   const chunks = chunkMarkdown(content);
   if (!chunks.length) return { ok: false, error: "There is no text in the document, only headings." };
-  if (chunks.length > 400) return { ok: false, error: "That is too long for one document. Split it into smaller ones." };
+  if (chunks.length > 2000) return { ok: false, error: "That is too long for one document. Split it into smaller ones." };
   return { ok: true, title: t, filename: filename.slice(0, 200), content, chunks };
 }
 
