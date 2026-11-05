@@ -85,8 +85,8 @@ export default function HelpPage() {
           Each client has its own agents, calls and numbers, so nothing gets mixed up. Open <B>Clients</B> in the top bar to
           see them all, add a new one, and switch between them. Once you have two or more, a switcher appears in the top bar.
         </P>
-        <Shot name="clients" height={800} alt="The Clients page with two client cards, a client switcher in the top bar and a dashboard link"
-          caption="1: switch client here. 2: open a client. 3: its private dashboard link (see Share with a client)." />
+        <Shot name="clients" height={1619} alt="The Clients page with three client cards linked to Votel, the client switcher in the top bar and the Add from Votel panel"
+          caption="1: switch client here. 2: a client linked to its Votel contact (below it, the private dashboard link: see Share with a client). 3: Add from Votel, which lists contacts carrying the agent-builder-client tag." />
         <P>
           Clients and Votel stay in step, in both directions, through one tag: <B>agent-builder-client</B>.
         </P>
