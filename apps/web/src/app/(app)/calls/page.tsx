@@ -17,7 +17,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
   const { current } = await currentClient(supabase);
   let query = supabase
     .from("calls")
-    .select("id, started_at, duration_s, goal_reached, transferred, source, agent_version, agent:agents(id, name)")
+    .select("id, started_at, duration_s, goal_reached, transferred, source, channel, agent_version, agent:agents(id, name)")
     .order("started_at", { ascending: false })
     .limit(100);
   if (current) query = query.eq("account_id", current.id);
@@ -59,9 +59,9 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
                   <span className="flex flex-wrap items-center gap-2 text-sm">
                     {c.goal_reached && <span className="chip chip-live">Successful</span>}
                     {c.transferred && <span className="chip">Transferred</span>}
-                    <span className="chip">{c.source === "phone" ? "Phone" : c.source === "web" ? "Website" : "Test call"}</span>
+                    <span className="chip">{c.channel === "chat" ? "Website chat" : c.source === "phone" ? "Phone" : c.source === "web" ? "Website" : "Test call"}</span>
                     <span className="chip" title="Agent version">Version {c.agent_version ?? "?"}</span>
-                    <span className="w-14 text-right tabular-nums text-muted">{duration(Number(c.duration_s))}</span>
+                    <span className="w-14 text-right tabular-nums text-muted">{c.channel === "chat" ? "-" : duration(Number(c.duration_s))}</span>
                   </span>
                 </Link>
               </li>

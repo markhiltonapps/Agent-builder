@@ -56,6 +56,7 @@ def call_row(
         "agent_version": loaded.version,
         "room": record["room"],
         "source": source,
+        "channel": channel_for(record["room"]),
         "caller_number": record.get("caller_number"),
         "started_at": _iso(started),
         "ended_at": _iso(started + float(record["duration_s"])),
@@ -70,6 +71,11 @@ def call_row(
         "transcript": transcript_lines(record.get("transcript", {})),
         "summary": record.get("summary"),
     }
+
+
+def channel_for(room: str) -> str:
+    """A website chat is typed (no minutes on the line); everything else is voice."""
+    return "chat" if room.startswith("web-chat-") else "voice"
 
 
 def source_for(room: str) -> str:

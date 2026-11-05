@@ -33,9 +33,9 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
         <h1 className="text-2xl font-semibold tracking-tight">{agent?.name ?? "Deleted agent"}</h1>
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
           <LocalTime iso={call.started_at} />
-          <span className="chip">{duration(Number(call.duration_s))}</span>
+          {call.channel !== "chat" && <span className="chip">{duration(Number(call.duration_s))}</span>}
           <span className="chip">Version {call.agent_version ?? "?"}</span>
-          <span className="chip">{call.source === "phone" ? "Phone" : call.source === "web" ? "Website" : "Test call"}</span>
+          <span className="chip">{call.channel === "chat" ? "Website chat" : call.source === "phone" ? "Phone" : call.source === "web" ? "Website" : "Test call"}</span>
           {call.goal_reached && <span className="chip chip-live">Successful</span>}
           {call.transferred && <span className="chip">Transferred{call.transfer_reason ? `: ${call.transfer_reason}` : ""}</span>}
           {call.votel_synced_at && <span className="chip chip-live">In Votel CRM</span>}
@@ -52,7 +52,7 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
       <section className="glass p-5" aria-label="Transcript">
         <h2 className="mb-3 text-sm font-medium">Transcript</h2>
         {transcript.length === 0 ? (
-          <p className="text-sm text-muted">Nothing was said on this call.</p>
+          <p className="text-sm text-muted">Nothing was said.</p>
         ) : (
           <ul className="space-y-3">
             {transcript.map((l, i) => (

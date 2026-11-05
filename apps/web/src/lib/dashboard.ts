@@ -5,6 +5,7 @@ export type DashboardStats = {
   tz: string;
   totals: {
     calls: number;
+    chats?: number;
     successful: number;
     transferred: number;
     messages: number;

@@ -8,10 +8,12 @@ import { EmbedDesigner } from "./embed-designer";
 
 export function EmbedForm({
   agentId, appUrl, published, initial,
-}: { agentId: string; appUrl: string; published: boolean; initial: { enabled: boolean; sites: string[]; limit: number } }) {
+}: { agentId: string; appUrl: string; published: boolean; initial: { enabled: boolean; sites: string[]; limit: number; voice: boolean; chat: boolean } }) {
   const [enabled, setEnabled] = useState(initial.enabled);
   const [sites, setSites] = useState(initial.sites.join("\n"));
   const [limit, setLimit] = useState(String(initial.limit));
+  const [voice, setVoice] = useState(initial.voice);
+  const [chat, setChat] = useState(initial.chat);
   const [saved, setSaved] = useState<{ enabled: boolean } | null>(initial.enabled ? { enabled: true } : null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -21,7 +23,7 @@ export function EmbedForm({
   function save() {
     setError(null);
     start(async () => {
-      const r = await saveEmbed(agentId, enabled, sites, Number(limit));
+      const r = await saveEmbed(agentId, enabled, sites, Number(limit), voice, chat);
       if (!r.ok) return setError(r.error);
       setSites(r.sites.join("\n"));
       setSaved({ enabled });
@@ -42,7 +44,7 @@ export function EmbedForm({
           <span className={`size-2.5 rounded-full ${saved?.enabled ? "bg-ok" : "bg-faint"}`} aria-hidden />
           <span className="font-medium">Website calls: {saved?.enabled ? "On" : "Off"}</span>
           <span className="text-sm text-muted">
-            {saved?.enabled ? `${sites.trim() ? sites.trim().split(/\n+/).slice(0, 2).join(", ") : "any website"} · up to ${limit} calls a day` : "Switch on to get your code"}
+            {saved?.enabled ? `${sites.trim() ? sites.trim().split(/\n+/).slice(0, 2).join(", ") : "any website"} · up to ${limit} a day · ${voice && chat ? "talk or chat" : voice ? "talk only" : "chat only"}` : "Switch on to get your code"}
           </span>
           <span className="ml-auto text-sm text-accent group-open:hidden">Change</span>
           <span className="ml-auto hidden text-sm text-accent group-open:inline">Hide</span>
@@ -50,8 +52,16 @@ export function EmbedForm({
 
         <form className="mt-4 grid gap-x-6 gap-y-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]" onSubmit={(e) => { e.preventDefault(); save(); }}>
           <div>
-            <Toggle label="Let visitors talk to this agent on my website" checked={enabled} onChange={setEnabled}
-              hint="Off by default. Switch it off at any time to stop all website calls." />
+            <Toggle label="Let visitors use this agent on my website" checked={enabled} onChange={setEnabled}
+              hint="Off by default. Switch it off at any time to stop everything." />
+            {enabled && (
+              <fieldset className="mt-2 border-0 p-0">
+                <legend className="mb-1 text-sm font-medium">Visitors can</legend>
+                <Toggle label="Talk (voice)" checked={voice} onChange={setVoice} />
+                <Toggle label="Chat (typing)" checked={chat} onChange={setChat} hint="Chat costs much less than a call, and some people prefer it." />
+                {!voice && !chat && <p className="mt-1 text-xs text-danger" role="alert">Choose at least one.</p>}
+              </fieldset>
+            )}
           </div>
 
           <div>
@@ -70,7 +80,7 @@ export function EmbedForm({
 
           <div className="space-y-3">
             <div>
-              <label htmlFor={limitId} className="mb-1 block text-sm font-medium">Most calls per day</label>
+              <label htmlFor={limitId} className="mb-1 block text-sm font-medium">Most calls and chats per day</label>
               <input id={limitId} type="number" inputMode="numeric" min={1} max={2000} className="field w-32" value={limit}
                 onChange={(e) => setLimit(e.target.value)} aria-describedby={`${limitId}-h`} />
               <p id={`${limitId}-h`} className="hint mt-1 max-w-[15rem]">

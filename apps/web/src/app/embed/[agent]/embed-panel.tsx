@@ -3,6 +3,7 @@
 import { Room, RoomEvent, Track, type Participant } from "livekit-client";
 import { useStickyScroll } from "@/lib/use-sticky-scroll";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChatPanel } from "./embed-chat";
 
 type Phase = "idle" | "connecting" | "live" | "ended";
 interface Line { id: string; who: "you" | "agent"; text: string }
@@ -17,7 +18,7 @@ const START_ERRORS: Record<string, string> = {
   not_ready: "This assistant isn't ready yet. Please try again later.",
 };
 
-export function EmbedPanel({ agentId, title }: { agentId: string; title: string }) {
+function VoicePanel({ agentId }: { agentId: string }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
@@ -130,13 +131,10 @@ export function EmbedPanel({ agentId, title }: { agentId: string; title: string 
 
   const inCall = phase === "connecting" || phase === "live";
   return (
-    <main className="flex min-h-dvh flex-col justify-center gap-4 p-5">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Talk to {title}</h1>
-        <p className="mt-1 text-sm text-muted">
-          You&apos;ll be speaking with an AI assistant. Allow your microphone when asked. Headphones help avoid echo.
-        </p>
-      </div>
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-muted">
+        You&apos;ll be speaking with an AI assistant. Allow your microphone when asked. Headphones help avoid echo.
+      </p>
 
       <div className="flex flex-wrap items-center gap-3">
         {!inCall ? (
@@ -177,6 +175,32 @@ export function EmbedPanel({ agentId, title }: { agentId: string; title: string 
         This call is recorded and transcribed so the business can follow up. Don&apos;t share anything you wouldn&apos;t
         want saved.
       </p>
+    </div>
+  );
+}
+
+/** The call box: talk, chat, or a choice between them, depending on what the owner switched on. */
+export function EmbedPanel({ agentId, title, voice, chat }: { agentId: string; title: string; voice: boolean; chat: boolean }) {
+  const [mode, setMode] = useState<"voice" | "chat">(voice ? "voice" : "chat");
+  const both = voice && chat;
+  const pill = (active: boolean) =>
+    `nav-pill px-4 py-2 text-sm focus-visible:outline-2 focus-visible:outline-accent ${active ? "" : "text-muted hover:text-text"}`;
+  return (
+    <main className="flex min-h-dvh flex-col gap-4 p-5">
+      <h1 className="text-xl font-semibold tracking-tight">
+        {mode === "chat" ? `Chat with ${title}` : `Talk to ${title}`}
+      </h1>
+      {both && (
+        <div role="tablist" aria-label="How would you like to reach us?" className="flex gap-1">
+          {(["voice", "chat"] as const).map((m) => (
+            <button key={m} role="tab" type="button" aria-selected={mode === m} {...(mode === m ? { "aria-current": "true" } : {})}
+              onClick={() => setMode(m)} className={pill(mode === m)}>
+              {m === "voice" ? "Talk" : "Chat"}
+            </button>
+          ))}
+        </div>
+      )}
+      {mode === "voice" ? <VoicePanel agentId={agentId} /> : <ChatPanel agentId={agentId} />}
     </main>
   );
 }

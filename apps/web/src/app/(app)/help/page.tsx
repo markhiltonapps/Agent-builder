@@ -15,6 +15,7 @@ const SECTIONS = [
   ["booking", "Appointments"],
   ["results", "See how it's doing"],
   ["share", "Share with a client"],
+  ["usage", "Usage and billing"],
   ["votel", "Votel: where to look"],
   ["cost", "What it costs"],
   ["trouble", "If something looks wrong"],
@@ -177,21 +178,24 @@ export default function HelpPage() {
         <P>
           The preview is a mock website running the real button, so what you see is what visitors get. Switch it between a
           computer and a phone screen, and between a light and a dark page. To test the real thing without leaving the page,
-          choose <B>Try a real call</B> above the preview (or click the button in the preview, then <B>Try a real call</B>). The live call box appears right there, even if you limited the agent to your own website: allow your microphone and talk
-          to your agent. A test call is a real call, so it costs the usual few cents a minute and counts toward your daily limit.
+          choose <B>Try it live</B> above the preview (or click the button in the preview, then <B>Try it live</B>). The live call box appears right there, even if you limited the agent to your own website: allow your microphone and talk
+          to your agent, or switch to <B>Chat</B> and type. A test call is a real call, so it costs the usual few cents a minute. A chat costs far less. Both count toward your daily limit.
         </P>
         <P>
           When it looks right, copy the code and paste it into the website just before the closing body tag. You can also choose
           <B> Built into the page</B> to place the call box right inside a page instead of floating. Visitors click, allow their
-          microphone, and talk to the live agent. Their calls show up under Calls and on the Dashboard, marked Website.
+          microphone, and talk to the live agent, or they choose <B>Chat</B> and type to it. Chat is the same agent with the same rules: it can take a message, send a booking link and request an appointment. Calls show up under Calls and on the Dashboard, marked Website, and chats are marked Website chat.
+        </P>
+        <P>
+          In the access bar at the top (choose <B>Change</B>), under <B>Visitors can</B>, you decide whether visitors may <B>Talk</B>, <B>Chat</B>, or both. Chat-only is the cheapest way to offer an agent on a website.
         </P>
         <Tip>
-          The preview never starts a call, so you can click around freely (only <B>Try a real call</B> does). Your design is remembered in this browser, so you
+          The preview never starts a call, so you can click around freely (only <B>Try it live</B> does). Your design is remembered in this browser, so you
           can come back and adjust it later. Codes you pasted earlier keep working exactly as they were.
         </Tip>
         <Tip>
           The <B>websites allowed to show it</B> list is optional. Leaving it blank is easiest, but anyone could copy your code.
-          The <B>Most calls per day</B> limit keeps the bill safe either way. To use it in a Votel website, paste the code into
+          The <B>Most calls and chats per day</B> limit keeps the bill safe either way. To use it in a Votel website, paste the code into
           the page&apos;s custom code option in Votel&apos;s website builder.
         </Tip>
 
@@ -251,6 +255,23 @@ export default function HelpPage() {
           one working immediately. <B>Turn off</B> removes the link.
         </P>
 
+        <H id="usage">Usage and billing</H>
+        <P>
+          Open <B>Usage</B> in the top bar to see the total minutes for each client, month by month. Use the arrows to move
+          between months. Only clients you own are listed, so each person only sees their own.
+        </P>
+        <Steps>
+          <li><B>Minutes</B> is the exact time on the line, from pick-up to hang-up.</li>
+          <li><B>Billable minutes</B> rounds every call up to a whole minute (a 61-second call counts as 2), the way most phone carriers and agencies bill. Use whichever your agreement with the client says.</li>
+          <li><B>Chats</B> are typed, so they have no minutes. They are counted in their own column.</li>
+        </Steps>
+        <P>
+          Choose <B>Download this month (CSV)</B> for a spreadsheet of every client, or <B>Calls (CSV)</B> on a row for the list of
+          calls behind that client&apos;s total, handy if a client asks how you got the number. By default only real customer calls
+          (phone and website) count. Choose <B>Include them</B> to add your own test calls. Days follow your own clock, so a call
+          just before midnight lands on the day you saw it.
+        </P>
+
         <H id="votel">Votel: where to look</H>
         <ul className="mt-3 list-disc space-y-2 pl-6 text-[0.95rem] leading-relaxed text-muted marker:text-faint">
           <li>
@@ -274,6 +295,7 @@ export default function HelpPage() {
             <tbody className="divide-y divide-line text-muted">
               <tr><th scope="row" className="px-4 py-3 font-medium text-text">Website or test call</th><td className="px-4 py-3">5 to 7 cents</td><td className="px-4 py-3">25 to 35 cents</td></tr>
               <tr><th scope="row" className="px-4 py-3 font-medium text-text">Phone call</th><td className="px-4 py-3">6 to 8 cents</td><td className="px-4 py-3">30 to 40 cents</td></tr>
+              <tr><th scope="row" className="px-4 py-3 font-medium text-text">Website chat</th><td className="px-4 py-3">No minutes</td><td className="px-4 py-3">A fraction of a cent to a few cents for a whole conversation</td></tr>
             </tbody>
           </table>
         </div>
@@ -281,6 +303,10 @@ export default function HelpPage() {
           That is the voice model (5 cents a minute), a small connection fee, and the agent&apos;s thinking, which varies. A
           phone number is free for your first one, then about $1 a month each, plus about 1 cent a minute on calls after a small
           free allowance. Hosting is a small monthly fee.
+        </P>
+        <P>
+          Chat is typed, so there is no voice model and no line time. It uses a small, low-cost text model, which is why it
+          costs a tiny fraction of a call. Offer chat next to talking, or on its own to keep costs lowest.
         </P>
 
         <H id="trouble">If something looks wrong</H>

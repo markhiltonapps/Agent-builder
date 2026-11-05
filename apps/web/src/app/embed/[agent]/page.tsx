@@ -11,5 +11,5 @@ export default async function EmbedPage({ params }: PageProps<"/embed/[agent]">)
   if (!isUuid(agent)) notFound();
   const info = await embedInfo(agent);
   if (!info || info === "error" || !info.enabled) notFound();
-  return <EmbedPanel agentId={agent} title={info.business || info.name} />;
+  return <EmbedPanel agentId={agent} title={info.business || info.name} voice={info.voice !== false} chat={info.chat !== false} />;
 }

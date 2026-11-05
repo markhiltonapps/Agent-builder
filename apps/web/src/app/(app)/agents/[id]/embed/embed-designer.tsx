@@ -17,7 +17,7 @@ const WORDS: Record<string, string> = {
   none: "No icon", mic: "Microphone", phone: "Phone", chat: "Chat",
   tight: "Close", normal: "Normal", roomy: "Roomy",
   desktop: "Computer", mobile: "Phone screen", light: "Light", dark: "Dark",
-  preview: "Preview", live: "Try a real call",
+  preview: "Preview", live: "Try it live",
 };
 
 const PANELS = [["look", "Words, color, logo"], ["shape", "Shape and size"], ["place", "Position"]] as const;
@@ -286,7 +286,7 @@ export function EmbedDesigner({ appUrl, agentId }: { appUrl: string; agentId: st
                   className={`mx-auto block h-[24rem] rounded-xl border-0 bg-white ${device === "mobile" ? "w-[375px] max-w-full" : "w-full"}`}
                 />
               </div>
-              <p className="text-xs text-faint">This is how it will look on a typical page. Click the button to see where the call box opens, then choose Try a real call to talk to your agent here. The preview itself never starts a call.</p>
+              <p className="text-xs text-faint">This is how it will look on a typical page. Click the button to see where the call box opens, then choose Try it live to talk or chat with your agent here. The preview itself never starts a call.</p>
             </>
           ) : (
             <>
@@ -298,7 +298,7 @@ export function EmbedDesigner({ appUrl, agentId }: { appUrl: string; agentId: st
                   className="mx-auto block h-[24rem] w-full max-w-[26rem] rounded-xl border-0 bg-[#0b0d14]"
                 />
               </div>
-              <p className="text-xs text-faint">This is the real agent, exactly what visitors get. Allow the microphone and talk to it. A test call is a real call: it costs the usual few cents a minute and counts toward your daily limit.</p>
+              <p className="text-xs text-faint">This is the real agent, exactly what visitors get. Talk to it (allow your microphone) or switch to Chat and type. A test call is a real call, so it costs the usual few cents a minute. A chat costs far less. Both count toward your daily limit.</p>
             </>
           )}
           {mode === "button" ? (

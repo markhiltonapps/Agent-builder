@@ -300,14 +300,15 @@ export async function syncAllToVotel(): Promise<SyncState> {
 export type EmbedSaveResult = { ok: true; sites: string[] } | { ok: false; error: string };
 
 /** Turn the website embed on or off for an agent, and say which sites may show it. */
-export async function saveEmbed(agentId: string, enabled: boolean, sitesText: string, dailyLimit: number): Promise<EmbedSaveResult> {
+export async function saveEmbed(agentId: string, enabled: boolean, sitesText: string, dailyLimit: number, voice = true, chat = true): Promise<EmbedSaveResult> {
   const { sites, bad } = parseSites(sitesText);
   if (bad.length) {
     return { ok: false, error: `These don't look like website addresses: ${bad.slice(0, 3).join(", ")}. Use something like example.com.` };
   }
   if (sites.length > MAX_SITES) return { ok: false, error: `Use at most ${MAX_SITES} websites.` };
   const limit = Math.round(Number(dailyLimit));
-  if (!(limit >= 1 && limit <= 2000)) return { ok: false, error: "Choose a daily limit between 1 and 2000 calls." };
+  if (!(limit >= 1 && limit <= 2000)) return { ok: false, error: "Choose a daily limit between 1 and 2000 calls and chats." };
+  if (enabled && !voice && !chat) return { ok: false, error: "Choose talking, chatting or both." };
 
   const supabase = await supabaseServer();
   const { error } = await supabase.rpc("set_embed_settings", {
@@ -315,6 +316,8 @@ export async function saveEmbed(agentId: string, enabled: boolean, sitesText: st
     p_enabled: enabled,
     p_origins: sites,
     p_limit: limit,
+    p_voice: voice,
+    p_chat: chat,
   });
   if (error) return { ok: false, error: "We couldn't save that. You may not have edit access to this agent." };
   forgetEmbedInfo(agentId);

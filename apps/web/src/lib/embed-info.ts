@@ -9,6 +9,8 @@ export type EmbedInfo = {
   enabled: boolean;
   origins: string[];
   published: boolean;
+  voice: boolean;
+  chat: boolean;
 };
 
 const TTL_MS = 30_000;
@@ -45,13 +47,13 @@ export function forgetEmbedInfo(agentId: string) {
 
 export type BeginStatus = "ok" | "disabled" | "unpublished" | "limit" | "error";
 
-/** Count one embedded call against the agent's daily cap. */
-export async function embedBegin(agentId: string): Promise<BeginStatus> {
+/** Count one embedded call or chat against the agent's daily cap. */
+export async function embedBegin(agentId: string, kind: "voice" | "chat" = "voice"): Promise<BeginStatus> {
   try {
     const res = await fetch(`${env.builderApiUrl}/v1/embed/begin`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${env.builderApiSecret}` },
-      body: JSON.stringify({ agent_id: agentId }),
+      body: JSON.stringify({ agent_id: agentId, kind }),
       cache: "no-store",
       signal: AbortSignal.timeout(8_000),
     });

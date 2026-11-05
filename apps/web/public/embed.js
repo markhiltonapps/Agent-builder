@@ -187,7 +187,7 @@
         // The designer page listens for this, so you can test the real agent without leaving it.
         var tryBtn = document.createElement("button");
         tryBtn.type = "button";
-        tryBtn.textContent = "Try a real call";
+        tryBtn.textContent = "Try it live";
         tryBtn.style.cssText = "all:unset;box-sizing:border-box;cursor:pointer;padding:10px 18px;border-radius:999px;background:" + color + ";color:" + ink + ";font:600 14px system-ui,sans-serif;border:1px solid rgba(255,255,255,.3)";
         tryBtn.addEventListener("click", function () { try { window.parent.postMessage({ neato: "try-live" }, "*"); } catch (e) { /* not in a frame */ } });
         note.appendChild(tryBtn);

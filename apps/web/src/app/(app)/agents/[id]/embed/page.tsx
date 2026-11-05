@@ -12,7 +12,7 @@ export default async function EmbedSettingsPage({ params }: PageProps<"/agents/[
   const supabase = await supabaseServer();
   const { data: agent } = await supabase
     .from("agents")
-    .select("id, name, published_version_id, embed_enabled, embed_origins, embed_daily_limit")
+    .select("id, name, published_version_id, embed_enabled, embed_origins, embed_daily_limit, embed_voice, embed_chat")
     .eq("id", id)
     .maybeSingle();
   if (!agent) notFound();
@@ -32,7 +32,7 @@ export default async function EmbedSettingsPage({ params }: PageProps<"/agents/[
         agentId={agent.id}
         appUrl={appUrl}
         published={agent.published_version_id !== null}
-        initial={{ enabled: agent.embed_enabled, sites: agent.embed_origins ?? [], limit: agent.embed_daily_limit }}
+        initial={{ enabled: agent.embed_enabled, sites: agent.embed_origins ?? [], limit: agent.embed_daily_limit, voice: agent.embed_voice !== false, chat: agent.embed_chat !== false }}
       />
     </div>
   );

@@ -12,7 +12,7 @@ export function Numbers({ s }: { s: DashboardStats }) {
   const t = s.totals;
   const rate = percent(t.successful, t.calls);
   const tiles: { label: string; value: React.ReactNode; note: string }[] = [
-    { label: "Calls", value: <CountUp to={t.calls} delayMs={250} />, note: `in the last ${s.days} days` },
+    { label: "Calls", value: <CountUp to={t.calls} delayMs={250} />, note: `in the last ${s.days} days${t.chats ? `, ${t.chats} ${t.chats === 1 ? "chat" : "chats"}` : ""}` },
     {
       label: "Reached their goal",
       value: rate === null ? "-" : <CountUp to={rate} kind="percent" delayMs={330} />,

@@ -84,7 +84,9 @@ async def test_a_database_error_is_an_embed_error(db):
 
 async def test_begin_returns_the_database_verdict(db):
     assert await embed.begin(AGENT, creds=db.creds) == "ok"
-    assert db.begin_calls == [{"p_agent": AGENT}]
+    assert db.begin_calls == [{"p_agent": AGENT, "p_kind": "voice"}]
+    assert await embed.begin(AGENT, "chat", creds=db.creds) == "ok"
+    assert db.begin_calls[-1] == {"p_agent": AGENT, "p_kind": "chat"}
     for verdict in ("disabled", "unpublished", "limit"):
         db.begin_result = verdict
         assert await embed.begin(AGENT, creds=db.creds) == verdict

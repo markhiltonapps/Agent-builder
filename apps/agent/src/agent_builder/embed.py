@@ -31,6 +31,8 @@ class EmbedInfo:
     enabled: bool
     origins: list[str]
     published: bool
+    voice: bool = True
+    chat: bool = True
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -39,6 +41,8 @@ class EmbedInfo:
             "enabled": self.enabled,
             "origins": self.origins,
             "published": self.published,
+            "voice": self.voice,
+            "chat": self.chat,
         }
 
 
@@ -61,7 +65,7 @@ async def info(agent_id: str, *, creds: tuple[str, str] | None = None) -> EmbedI
                 f"{base}/agents",
                 params={
                     "id": f"eq.{agent_id}",
-                    "select": "name,embed_enabled,embed_origins,published_version_id",
+                    "select": "name,embed_enabled,embed_origins,published_version_id,embed_voice,embed_chat",
                 },
                 headers=supabase.headers(key),
             ) as r:
@@ -94,11 +98,13 @@ async def info(agent_id: str, *, creds: tuple[str, str] | None = None) -> EmbedI
         enabled=bool(agent.get("embed_enabled")),
         origins=[str(o) for o in agent.get("embed_origins") or []],
         published=bool(agent.get("published_version_id")),
+        voice=agent.get("embed_voice") is not False,
+        chat=agent.get("embed_chat") is not False,
     )
 
 
-async def begin(agent_id: str, *, creds: tuple[str, str] | None = None) -> str:
-    """Count one embedded call. 'ok', 'disabled', 'unpublished' or 'limit'."""
+async def begin(agent_id: str, kind: str = "voice", *, creds: tuple[str, str] | None = None) -> str:
+    """Count one embedded call or chat (``kind`` is "voice" or "chat"). 'ok', 'disabled', 'unpublished' or 'limit'."""
     if not valid_agent_id(agent_id):
         return "disabled"
     creds = creds or supabase.credentials()
@@ -110,7 +116,9 @@ async def begin(agent_id: str, *, creds: tuple[str, str] | None = None) -> str:
             aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as http,
             http.post(
                 f"{url.rstrip('/')}/rest/v1/rpc/embed_begin",
-                data=json.dumps({"p_agent": agent_id}),
+                data=json.dumps(
+                    {"p_agent": agent_id, "p_kind": "chat" if kind == "chat" else "voice"}
+                ),
                 headers=supabase.headers(key),
             ) as r,
         ):

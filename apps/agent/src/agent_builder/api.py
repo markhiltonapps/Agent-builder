@@ -23,6 +23,7 @@ from aiohttp import web
 from pydantic import ValidationError
 
 from . import embed, votel_clients, votel_import
+from .chat import ChatError, ChatService
 from .compiler import compile_agent
 from .config import AgentConfig
 from .draft import DraftError, draft
@@ -183,12 +184,13 @@ async def embed_begin(request: web.Request) -> web.Response:
     try:
         body = await request.json()
         agent_id = str(body["agent_id"])
+        kind = "chat" if body.get("kind") == "chat" else "voice"
     except (ValueError, KeyError, TypeError):
         raise web.HTTPBadRequest(
             text='{"error": "agent_id is required"}', content_type="application/json"
         ) from None
     try:
-        return web.json_response({"status": await embed.begin(agent_id)})
+        return web.json_response({"status": await embed.begin(agent_id, kind)})
     except embed.EmbedError:
         return web.json_response({"error": "unavailable"}, status=502)
 
@@ -296,6 +298,51 @@ async def votel_client_push(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "contact_id": contact_id})
 
 
+CHAT = web.AppKey("chat", ChatService)
+_CHAT_STATUS = {
+    "disabled": 404,
+    "unpublished": 409,
+    "limit": 429,
+    "busy": 503,
+    "gone": 410,
+    "too_long": 413,
+    "empty": 400,
+    "try_again": 502,
+}
+
+
+def _chat_failed(e: ChatError) -> web.Response:
+    return web.json_response({"ok": False, "reason": e.code}, status=_CHAT_STATUS.get(e.code, 502))
+
+
+async def chat_start(request: web.Request) -> web.Response:
+    """POST {"agent_id"} -> {"ok": true, "session", "greeting"}. Counts one chat against the daily cap."""
+    agent_id = await _text(request, "agent_id", 64)
+    try:
+        session, greeting = await request.app[CHAT].start(agent_id)
+    except ChatError as e:
+        return _chat_failed(e)
+    return web.json_response({"ok": True, "session": session, "greeting": greeting})
+
+
+async def chat_send(request: web.Request) -> web.Response:
+    """POST {"session", "message"} -> {"ok": true, "reply"}."""
+    session = await _text(request, "session", 64)
+    message = await _text(request, "message", 4000)
+    try:
+        reply = await request.app[CHAT].send(session, message)
+    except ChatError as e:
+        return _chat_failed(e)
+    return web.json_response({"ok": True, "reply": reply})
+
+
+async def chat_end(request: web.Request) -> web.Response:
+    """POST {"session"} -> {"ok": true}. Finishes the chat: summary, Calls, Votel."""
+    session = await _text(request, "session", 64)
+    await request.app[CHAT].end(session)
+    return web.json_response({"ok": True})
+
+
 async def schema(_request: web.Request) -> web.Response:
     return web.json_response(AgentConfig.model_json_schema())
 
@@ -304,7 +351,7 @@ async def healthz(_request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
-def make_app(secret: str) -> web.Application:
+def make_app(secret: str, chat: ChatService | None = None) -> web.Application:
     if len(secret) < 16:
         raise ValueError("BUILDER_API_SECRET must be at least 16 characters")
 
@@ -317,6 +364,12 @@ def make_app(secret: str) -> web.Application:
         return await handler(request)
 
     app = web.Application(middlewares=[auth], client_max_size=MAX_BODY_BYTES)
+    app[CHAT] = chat or ChatService()
+
+    async def finish_chats(app: web.Application) -> None:
+        await app[CHAT].close()  # a chat in progress is saved when the server stops
+
+    app.on_cleanup.append(finish_chats)
     app.router.add_post("/v1/validate", validate)
     app.router.add_post("/v1/compile", compile_)
     app.router.add_post("/v1/directory/sync", directory_sync)
@@ -330,6 +383,9 @@ def make_app(secret: str) -> web.Application:
     app.router.add_get("/v1/votel/clients", votel_clients_list)
     app.router.add_post("/v1/votel/client", votel_client_get)
     app.router.add_post("/v1/votel/client-push", votel_client_push)
+    app.router.add_post("/v1/chat/start", chat_start)
+    app.router.add_post("/v1/chat/send", chat_send)
+    app.router.add_post("/v1/chat/end", chat_end)
     app.router.add_get("/v1/schema", schema)
     app.router.add_get("/healthz", healthz)
     return app

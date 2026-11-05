@@ -13,7 +13,7 @@ import aiohttp
 
 log = logging.getLogger("agent_builder.summary")
 
-DEFAULT_MODEL = "gpt-5-mini"
+DEFAULT_MODEL = "gpt-6-luna"
 SYSTEM = (
     "You summarize phone calls between an AI receptionist and a caller for a busy business "
     "owner. In two or three plain sentences say why the caller phoned, what the agent did or "

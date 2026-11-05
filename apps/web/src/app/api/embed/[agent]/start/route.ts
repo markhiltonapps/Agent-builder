@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { embedBegin } from "@/lib/embed-info";
 import { isSameOrigin, isUuid, makeLimiter } from "@/lib/embed-code";
+import { ownOrigins, visitorOf } from "@/lib/embed-origin";
 import { visitorToken } from "@/lib/livekit";
 
 // Starts one call for an anonymous visitor on an embedded page. Public on purpose, so it is
@@ -10,17 +11,6 @@ import { visitorToken } from "@/lib/livekit";
 const perVisitor = makeLimiter(5, 10 * 60_000);
 const everyone = makeLimiter(120, 60_000);
 
-/** The addresses this app counts as its own: the configured one, and the one this request used. */
-function ownOrigins(req: NextRequest): string[] {
-  const proto = req.headers.get("x-forwarded-proto") ?? "https";
-  const arrived = `${proto}://${req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? ""}`;
-  try {
-    return process.env.APP_URL ? [new URL(process.env.APP_URL).origin, arrived] : [arrived];
-  } catch {
-    return [arrived];
-  }
-}
-
 const say = (status: number, error: string) =>
   NextResponse.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -29,10 +19,10 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/embed/[agen
   if (!isUuid(agent)) return say(404, "unavailable");
   if (!isSameOrigin(req.headers.get("origin"), ownOrigins(req))) return say(403, "forbidden");
 
-  const visitor = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+  const visitor = visitorOf(req);
   if (!everyone("all") || !perVisitor(visitor)) return say(429, "slow_down");
 
-  switch (await embedBegin(agent)) {
+  switch (await embedBegin(agent, "voice")) {
     case "ok":
       break;
     case "limit":

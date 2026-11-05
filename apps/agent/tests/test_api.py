@@ -4,6 +4,7 @@ import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
 from agent_builder.api import make_app
+from agent_builder.chat import ChatError
 from agent_builder.compiler import compile_agent
 from agent_builder.loader import DEFAULT_CONFIG, load_file
 
@@ -94,3 +95,55 @@ async def test_a_booking_link_is_validated_with_a_plain_message_and_reaches_the_
     raw["booking"] = {"url": "https://book.example.com/book/estimate", "channel": "sms"}
     r = await client.post("/v1/compile", json={"config": raw}, headers=AUTH)
     assert r.status == 200 and "link by text" in (await r.json())["voice_instructions"]
+
+
+class FakeChat:
+    def __init__(self):
+        self.calls: list[tuple] = []
+
+    async def start(self, agent_id):
+        self.calls.append(("start", agent_id))
+        if agent_id == "limit":
+            raise ChatError("limit")
+        return "sess1", "Hi, how can I help?"
+
+    async def send(self, session, message):
+        self.calls.append(("send", session, message))
+        if session == "gone":
+            raise ChatError("gone")
+        return f"You said: {message}"
+
+    async def end(self, session):
+        self.calls.append(("end", session))
+        return True
+
+    async def close(self):
+        self.calls.append(("close",))
+
+
+async def test_chat_endpoints_start_send_and_end():
+    fake = FakeChat()
+    async with TestClient(TestServer(make_app(SECRET, chat=fake))) as c:
+        assert (await c.post("/v1/chat/start", json={"agent_id": "a"})).status == 401
+        r = await c.post("/v1/chat/start", json={"agent_id": "a"}, headers=AUTH)
+        assert await r.json() == {"ok": True, "session": "sess1", "greeting": "Hi, how can I help?"}
+        r = await c.post(
+            "/v1/chat/send", json={"session": "sess1", "message": "hello"}, headers=AUTH
+        )
+        assert await r.json() == {"ok": True, "reply": "You said: hello"}
+        r = await c.post("/v1/chat/end", json={"session": "sess1"}, headers=AUTH)
+        assert (await r.json())["ok"] is True
+    assert fake.calls == [("start", "a"), ("send", "sess1", "hello"), ("end", "sess1"), ("close",)]
+
+
+async def test_chat_problems_come_back_with_a_reason_and_a_status():
+    async with TestClient(TestServer(make_app(SECRET, chat=FakeChat()))) as c:
+        r = await c.post("/v1/chat/start", json={"agent_id": "limit"}, headers=AUTH)
+        assert (r.status, await r.json()) == (429, {"ok": False, "reason": "limit"})
+        r = await c.post("/v1/chat/send", json={"session": "gone", "message": "x"}, headers=AUTH)
+        assert (r.status, (await r.json())["reason"]) == (410, "gone")
+        assert (await c.post("/v1/chat/send", json={"session": "s"}, headers=AUTH)).status == 400
+        long = await c.post(
+            "/v1/chat/send", json={"session": "s", "message": "x" * 4001}, headers=AUTH
+        )
+        assert long.status == 400
