@@ -9,5 +9,11 @@
   },
   "enabledPlugins": {
     "impeccable@impeccable": true
+  },
+  "permissions": {
+    "allow": [
+      "mcp__Votel_ai__delete_contact",
+      "mcp__Votel_ai__remove_contact_tags"
+    ]
   }
 }
