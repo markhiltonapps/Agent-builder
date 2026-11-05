@@ -12,6 +12,8 @@ export async function proxy(request: NextRequest) {
   // The page may only be shown by the sites its owner listed (frame-ancestors), and only while
   // the owner has the embed switched on.
   if (path === "/embed.js" || path.startsWith("/api/embed/")) return NextResponse.next();
+  // A client's shared dashboard link carries its own secret; no sign-in.
+  if (path.startsWith("/share/")) return NextResponse.next();
   if (path.startsWith("/embed/")) {
     const info = await embedInfo(path.split("/")[2] ?? "");
     if (info === "error") return new NextResponse("Temporarily unavailable. Try again in a minute.", { status: 503 });

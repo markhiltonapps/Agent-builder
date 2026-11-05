@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { currentClient } from "@/lib/client";
 import { supabaseServer } from "@/lib/supabase/server";
 import { listVotelAgents } from "@/lib/votel-import";
 import { AiForm, TemplateGrid, VotelImportForm } from "./pickers";
@@ -12,8 +13,8 @@ export default async function NewAgentPage({ searchParams }: PageProps<"/agents/
   const ai = tab === "ai";
   const votel = tab === "votel";
   const supabase = await supabaseServer();
-  const { data: accounts } = await supabase.from("accounts").select("id").order("created_at").limit(1);
-  if (!accounts?.length) redirect("/agents");
+  const { current } = await currentClient(supabase);
+  if (!current) redirect("/agents");
 
   const pill = (active: boolean) =>
     `nav-pill px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-accent ${active ? "" : "text-muted hover:text-text"}`;
@@ -35,7 +36,7 @@ export default async function NewAgentPage({ searchParams }: PageProps<"/agents/
         <Link href="/agents/new?tab=votel" aria-current={votel ? "page" : undefined} className={pill(votel)}>Import from Votel</Link>
       </nav>
 
-      {ai ? <AiForm accountId={accounts[0].id} /> : votel ? <VotelTab accountId={accounts[0].id} /> : <TemplateGrid />}
+      {ai ? <AiForm accountId={current.id} /> : votel ? <VotelTab accountId={current.id} /> : <TemplateGrid />}
     </section>
   );
 }

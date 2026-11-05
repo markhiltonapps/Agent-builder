@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { findTemplate, handoffLines, neverLines } from "@/lib/template-library";
+import { currentClient } from "@/lib/client";
 import { supabaseServer } from "@/lib/supabase/server";
 import { TemplateForm } from "./template-form";
 
@@ -14,8 +15,8 @@ export default async function TemplatePage({ params }: PageProps<"/agents/new/[k
   const t = findTemplate((await params).key);
   if (!t) notFound();
   const supabase = await supabaseServer();
-  const { data: accounts } = await supabase.from("accounts").select("id").order("created_at").limit(1);
-  if (!accounts?.length) redirect("/agents");
+  const { current } = await currentClient(supabase);
+  if (!current) redirect("/agents");
 
   const handoffs = handoffLines(t.config);
   const nevers = neverLines(t.config);
@@ -49,7 +50,7 @@ export default async function TemplatePage({ params }: PageProps<"/agents/new/[k
       <aside className="glass h-fit p-5 lg:sticky lg:top-20" aria-labelledby="form-h">
         <h2 id="form-h" className="mb-4 font-medium">Make it yours</h2>
         <TemplateForm
-          accountId={accounts[0].id}
+          accountId={current.id}
           templateKey={t.key}
           defaultName={`${t.label} receptionist`}
           defaultDescription={t.description}

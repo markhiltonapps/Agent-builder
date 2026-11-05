@@ -8,6 +8,8 @@ export const setUnsaved = (value: boolean) => {
   unsaved = value;
 };
 
+export const hasUnsaved = () => unsaved;
+
 /**
  * Call from a click or submit handler. With nothing unsaved the event goes through untouched.
  * Otherwise it is held, the person is asked, and `proceed` runs only if they agree to leave.

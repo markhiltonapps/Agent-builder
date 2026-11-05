@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LocalTime } from "@/components/local-time";
+import { currentClient } from "@/lib/client";
 import { supabaseServer } from "@/lib/supabase/server";
 import { CreateAccountForm, SyncVotelButton } from "./forms";
 
@@ -8,15 +9,16 @@ export const metadata: Metadata = { title: "Agents" };
 
 export default async function AgentsPage() {
   const supabase = await supabaseServer();
-  const [{ data: accounts }, { data: agents }] = await Promise.all([
-    supabase.from("accounts").select("id, name").order("created_at"),
-    supabase
-      .from("agents")
-      .select("id, name, updated_at, published:agent_versions!agents_published_fk(version)")
-      .order("updated_at", { ascending: false }),
-  ]);
+  const { current } = await currentClient(supabase);
+  const { data: agents } = current
+    ? await supabase
+        .from("agents")
+        .select("id, name, updated_at, published:agent_versions!agents_published_fk(version)")
+        .eq("account_id", current.id)
+        .order("updated_at", { ascending: false })
+    : { data: null };
 
-  if (!accounts?.length) {
+  if (!current) {
     return (
       <section className="glass mx-auto mt-10 max-w-lg p-6">
         <h1 className="mb-1 text-xl font-semibold">Name your workspace</h1>
@@ -28,7 +30,7 @@ export default async function AgentsPage() {
     );
   }
 
-  const account = accounts[0];
+  const account = current;
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <section aria-labelledby="agents-h">

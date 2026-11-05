@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LocalTime } from "@/components/local-time";
 import { duration } from "@/lib/format";
+import { currentClient } from "@/lib/client";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Calls" };
@@ -13,11 +14,13 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
   const agentId = typeof agentParam === "string" && UUID.test(agentParam) ? agentParam : null;
 
   const supabase = await supabaseServer();
+  const { current } = await currentClient(supabase);
   let query = supabase
     .from("calls")
     .select("id, started_at, duration_s, goal_reached, transferred, source, agent_version, agent:agents(id, name)")
     .order("started_at", { ascending: false })
     .limit(100);
+  if (current) query = query.eq("account_id", current.id);
   if (agentId) query = query.eq("agent_id", agentId);
   const { data: calls } = await query;
 

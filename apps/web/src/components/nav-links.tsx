@@ -7,6 +7,7 @@ import { leaveIfSafe } from "@/lib/unsaved";
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/agents", label: "Agents" },
+  { href: "/clients", label: "Clients" },
   { href: "/calls", label: "Calls" },
   { href: "/numbers", label: "Numbers" },
 ];

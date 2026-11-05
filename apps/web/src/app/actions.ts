@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { compileConfig, draftConfig, reviseConfig } from "@/lib/builder-api";
@@ -317,4 +318,44 @@ export async function saveEmbed(agentId: string, enabled: boolean, sitesText: st
   forgetEmbedInfo(agentId);
   revalidatePath(`/agents/${agentId}/embed`);
   return { ok: true, sites };
+}
+
+// --- clients (workspaces) ----------------------------------------------------------------
+
+const rememberClient = async (id: string) =>
+  (await cookies()).set("client", id, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", httpOnly: true });
+
+/** Work in another client. Only a workspace the person belongs to is accepted. */
+export async function switchClient(accountId: string): Promise<void> {
+  const supabase = await supabaseServer();
+  const { data } = await supabase.from("accounts").select("id").eq("id", accountId).maybeSingle();
+  if (data) await rememberClient(data.id);
+  revalidatePath("/", "layout");
+}
+
+export async function openClient(form: FormData): Promise<void> {
+  await switchClient(text(form, "account_id"));
+  redirect("/dashboard");
+}
+
+/** Add a client: a new workspace the person owns, which becomes the one they are working in. */
+export async function addClient(_: FormState, form: FormData): Promise<FormState> {
+  const name = text(form, "name");
+  if (!name) return { error: "Enter the client's name." };
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.rpc("create_account", { p_name: name.slice(0, 200) });
+  if (error || !data) return { error: "We couldn't add the client. Try again." };
+  await rememberClient((data as { id: string }).id);
+  redirect("/clients");
+}
+
+export type ShareResult = { ok: true; token: string | null } | { ok: false; error: string };
+
+/** Switch a client's read-only dashboard link on or off, or replace it with a new one. */
+export async function setClientShare(accountId: string, enabled: boolean, rotate = false): Promise<ShareResult> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.rpc("set_client_share", { p_account: accountId, p_enabled: enabled, p_rotate: rotate });
+  if (error) return { ok: false, error: "Only the owner of a client can change its dashboard link." };
+  revalidatePath("/clients");
+  return { ok: true, token: (data as string | null) ?? null };
 }
