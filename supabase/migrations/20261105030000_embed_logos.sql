@@ -34,3 +34,14 @@ create policy embed_logos_delete on storage.objects for delete to authenticated
         and private.has_role(a.account_id, array['owner', 'editor'])
     )
   );
+
+-- Owners and editors can also see (list, and so remove) the logos of their own agents.
+drop policy if exists embed_logos_select on storage.objects;
+create policy embed_logos_select on storage.objects for select to authenticated
+  using (
+    bucket_id = 'embed-logos' and exists (
+      select 1 from public.agents a
+      where a.id::text = (storage.foldername(objects.name))[1]
+        and private.has_role(a.account_id, array['owner', 'editor'])
+    )
+  );
