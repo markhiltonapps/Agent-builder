@@ -94,7 +94,7 @@ export default function HelpPage() {
           <li>To go back up, click <B>◂ All clients</B> at the top left of the top bar.</li>
           <li>To change a client&apos;s name (a typo, say), open the client, choose <B>Settings</B>, edit the <B>Client name</B> and choose <B>Save name</B>.</li>
         </Steps>
-        <Shot name="around" height={620} alt="Inside a client: the coloured bar names Right Weight Scale and lists its Dashboard, Agents, Knowledge, Calls, Phone numbers and Settings, with All clients at the top left"
+        <Shot name="around" height={250} alt="Inside a client: the coloured bar names the client and lists its Dashboard, Agents, Knowledge, Calls, Phone numbers and Settings, with All clients at the top left"
           caption="1: back to All clients. 2: which client you are in (and a menu to switch to another). 3: everything about that client." />
         <Tip>
           If you ever wonder whose dashboard or agents you are looking at, look at the coloured bar: it always says. Anything that
@@ -121,7 +121,7 @@ export default function HelpPage() {
         <P>
           Clients and Votel stay in step, in both directions, through one tag: <B>agent-builder-client</B>.
         </P>
-        <Shot name="clients-votel" height={420} alt="The Add a client form and the Add from Votel panel at the bottom of the All clients page"
+        <Shot name="clients-votel" height={425} alt="The Add a client form and the Add from Votel panel at the bottom of the All clients page"
           caption="At the bottom of the All clients page: add a client here (and in Votel), or bring clients over from Votel with Add from Votel." />
         <Steps>
           <li><B>From Votel to here:</B> in Votel, open a contact and give it the tag <B>agent-builder-client</B>. Back here, choose <B>Check Votel for clients</B> (under <B>Add from Votel</B>) and then <B>Add as client</B>. It becomes a client with its own empty workspace. If the contact has a company name, that is the client&apos;s name.</li>
@@ -152,11 +152,11 @@ export default function HelpPage() {
           person, and what it must never say.
         </P>
         <Shot name="agents" alt="The Agents page with the Choose a ready-made agent button highlighted" height={800} caption="1: start here." />
-        <Shot name="gallery" alt="The gallery of ready-made agents with a search box" caption="1: search by kind of business. 2: click one to see what it does." />
+        <Shot name="gallery" height={900} alt="The gallery of ready-made agents with a search box" caption="1: search by kind of business. 2: click one to see what it does." />
         <P>
           Click a card to see what it handles, what it asks every caller, and the rules it follows. Then make it yours:
         </P>
-        <Shot name="template" alt="A ready-made dental agent with a form for the business name and description"
+        <Shot name="template" height={900} alt="A ready-made dental agent with a form for the business name and description"
           caption="1: the name callers hear. 2: describe the business: where you are, what you offer, when you're open. 3: create it." />
         <Tip>
           The agent only says what is written in the description. It never makes up prices, hours or availability. If it
@@ -186,7 +186,7 @@ export default function HelpPage() {
           Stuck for words? Open <B>Ask AI to change this agent</B>, say what you want (for example, “be more formal”), and
           review the changes before you apply them.
         </P>
-        <Shot name="unsaved" height={260} alt="The editor header showing Unsaved changes and a Save changes button"
+        <Shot name="unsaved" height={259} alt="The editor header showing Unsaved changes and a Save changes button"
           caption="1: when you change something, Save changes lights up. Saving makes a new version; it doesn't go live yet." />
 
         <H id="knowledge">Give your agent knowledge</H>
@@ -196,7 +196,7 @@ export default function HelpPage() {
           named in the coloured bar). Only that client&apos;s agents use it, and what you add for one client is never heard by another.
           To add knowledge for a different client, open that client first (click it under <B>All clients</B>, or use the client menu in the coloured bar), then choose <B>Knowledge</B>.
         </P>
-        <Shot name="knowledge" height={800} alt="The Knowledge page: a box to choose or drop files, a place to write a document, and a list of documents with who uses each"
+        <Shot name="knowledge" height={920} alt="The Knowledge page: a box to choose or drop files, a place to write a document, and a list of documents with who uses each"
           caption="1: choose or drop files. 2: or write a document here. 3: a document; click it to read or change it. 4: which agents use it." />
         <Steps>
           <li>Choose <B>Choose files</B>, or drop files onto the box. Markdown (<B>.md</B>) and plain text (<B>.txt</B>) both work, up to 2 MB each, and you can add several at once. A long file, such as a whole website saved as one Markdown file, is split into parts for you at its headings (&ldquo;Example site (part 2 of 6)&rdquo;). Or open <B>Or write a document here</B> and type or paste it.</li>
@@ -232,7 +232,7 @@ export default function HelpPage() {
           a customer. Headphones help stop echo. You can mute the microphone or end the call at any time, and the
           transcript appears as you talk.
         </P>
-        <Shot name="testcall" alt="The test call page with a Start call button" caption="1: start the call." />
+        <Shot name="testcall" height={480} alt="The test call page with a Start call button" caption="1: start the call." />
         <Tip>Test calls use the <B>published</B> version. If you just saved changes, publish them first to hear them.</Tip>
 
         <H id="publish">Put it live</H>
@@ -249,7 +249,7 @@ export default function HelpPage() {
           design what visitors will see. Everything fits on one screen: the controls are on the left in three tabs, and the
           preview and your code are on the right.
         </P>
-        <Shot name="embed" height={1289} alt="The Put on website page: the access bar with Visitors can, the design tabs, live preview and the code"
+        <Shot name="embed" height={1351} alt="The Put on website page: the access bar with Visitors can, the design tabs, live preview and the code"
           caption="1: whether visitors can talk, chat or both (in the access bar, after Change). 2: the design tabs. 3: switch between the preview and trying it live. 4: the live preview. 5: your code, with your choices already in it." />
         <Steps>
           <li><B>Words, color, logo:</B> the words on the button, its color (pick a swatch or type your own hex code, like #0f766e), and an optional logo. Upload a PNG, JPG or WebP under 512 KB and it shows as a small round badge.</li>
@@ -323,7 +323,7 @@ export default function HelpPage() {
           Votel.
         </P>
         <Shot name="calls" alt="The list of calls" caption="1: open a call." />
-        <Shot name="call" alt="A call with its transcript and what the agent did" />
+        <Shot name="call" height={900} alt="A call with its transcript and what the agent did" />
 
         <H id="share">Share with a client</H>
         <P>
@@ -342,7 +342,7 @@ export default function HelpPage() {
           Open <B>Usage and billing</B> in the top bar to see the total minutes for each client, month by month. Use the arrows to move
           between months. Only clients you own are listed, so each person only sees their own.
         </P>
-        <Shot name="usage" height={560} alt="The Usage page: a month, the minutes for each client, billable minutes and download buttons"
+        <Shot name="usage" height={660} alt="The Usage page: a month, the minutes for each client, billable minutes and download buttons"
           caption="1: choose the month. 2: billable minutes, the number to bill from. 3: chats, counted separately. 4: download every client as a spreadsheet. 5: download the calls behind one client's total." />
         <Steps>
           <li><B>Minutes</B> is the exact time on the line, from pick-up to hang-up.</li>
