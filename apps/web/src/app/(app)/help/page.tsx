@@ -21,12 +21,12 @@ const SECTIONS = [
   ["trouble", "If something looks wrong"],
 ] as const;
 
-function Shot({ name, alt, height = 800, caption }: { name: string; alt: string; height?: number; caption?: string }) {
+function Shot({ name, alt, height = 800, width = 1280, caption }: { name: string; alt: string; height?: number; width?: number; caption?: string }) {
   return (
     <figure className="my-4">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={`/help/${name}.webp`} alt={alt} width={1280} height={height} loading="lazy"
+        src={`/help/${name}.webp`} alt={alt} width={width} height={height} loading="lazy" style={{ maxWidth: width }}
         className="h-auto w-full rounded-2xl border border-line shadow-[0_18px_50px_-22px_rgb(0_0_0/0.8)]"
       />
       {caption && <figcaption className="mt-2 text-xs text-faint">{caption}</figcaption>}
@@ -168,8 +168,8 @@ export default function HelpPage() {
           design what visitors will see. Everything fits on one screen: the controls are on the left in three tabs, and the
           preview and your code are on the right.
         </P>
-        <Shot name="embed" height={1020} alt="The Put on website page: access bar, design tabs, live preview and the code"
-          caption="1: website calls on or off. 2: the design tabs. 3: switch between the preview and a real call. 4: the live preview. 5: your code, with your choices already in it." />
+        <Shot name="embed" height={1289} alt="The Put on website page: the access bar with Visitors can, the design tabs, live preview and the code"
+          caption="1: whether visitors can talk, chat or both (in the access bar, after Change). 2: the design tabs. 3: switch between the preview and trying it live. 4: the live preview. 5: your code, with your choices already in it." />
         <Steps>
           <li><B>Words, color, logo:</B> the words on the button, its color (pick a swatch or type your own hex code, like #0f766e), and an optional logo. Upload a PNG, JPG or WebP under 512 KB and it shows as a small round badge.</li>
           <li><B>Shape and size:</B> pill, rounded, square, round, or the <B>Glowing orb</B>: a small sphere that softly pulses so visitors can tell something intelligent is listening. Your words appear beside the orb when someone points at it. Also size, look (solid, glass or outline) and an icon.</li>
@@ -187,8 +187,9 @@ export default function HelpPage() {
           microphone, and talk to the live agent, or they choose <B>Chat</B> and type to it. Chat is the same agent with the same rules: it can take a message, send a booking link and request an appointment. Calls show up under Calls and on the Dashboard, marked Website, and chats are marked Website chat.
         </P>
         <P>
-          In the access bar at the top (choose <B>Change</B>), under <B>Visitors can</B>, you decide whether visitors may <B>Talk</B>, <B>Chat</B>, or both. Chat-only is the cheapest way to offer an agent on a website.
+          In the access bar at the top (choose <B>Change</B>), under <B>Visitors can</B>, you decide whether visitors may <B>Talk</B>, <B>Chat</B>, or both. Chat-only is the cheapest way to offer an agent on a website. When both are on, the call box starts with a <B>Talk</B> and <B>Chat</B> choice.
         </P>
+        <Shot name="chat" width={420} height={640} alt="The call box with Talk and Chat choices, showing a chat with the agent" caption="What a visitor sees when they choose Chat: the agent greets them, they type, and it answers. Nothing starts, or counts toward the daily limit, until they press Start chatting." />
         <Tip>
           The preview never starts a call, so you can click around freely (only <B>Try it live</B> does). Your design is remembered in this browser, so you
           can come back and adjust it later. Codes you pasted earlier keep working exactly as they were.
@@ -260,6 +261,8 @@ export default function HelpPage() {
           Open <B>Usage</B> in the top bar to see the total minutes for each client, month by month. Use the arrows to move
           between months. Only clients you own are listed, so each person only sees their own.
         </P>
+        <Shot name="usage" height={560} alt="The Usage page: a month, the minutes for each client, billable minutes and download buttons"
+          caption="1: choose the month. 2: billable minutes, the number to bill from. 3: chats, counted separately. 4: download every client as a spreadsheet. 5: download the calls behind one client's total." />
         <Steps>
           <li><B>Minutes</B> is the exact time on the line, from pick-up to hang-up.</li>
           <li><B>Billable minutes</B> rounds every call up to a whole minute (a 61-second call counts as 2), the way most phone carriers and agencies bill. Use whichever your agreement with the client says.</li>
