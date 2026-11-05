@@ -17,7 +17,10 @@ const WORDS: Record<string, string> = {
   none: "No icon", mic: "Microphone", phone: "Phone", chat: "Chat",
   tight: "Close", normal: "Normal", roomy: "Roomy",
   desktop: "Computer", mobile: "Phone screen", light: "Light", dark: "Dark",
+  preview: "Preview", live: "Try a real call",
 };
+
+const PANELS = [["look", "Words, color, logo"], ["shape", "Shape and size"], ["place", "Position"]] as const;
 
 /** A row of choices where exactly one is picked: real radio buttons, styled as pills. */
 function Choice<T extends string>({ legend, value, options, onChange }: { legend: string; value: T; options: readonly T[]; onChange: (v: T) => void }) {
@@ -48,7 +51,7 @@ function HexField({ value, onChange }: { value: string; onChange: (hex: string) 
   return (
     <div>
       <label className="label" htmlFor={id}>Or type a hex code</label>
-      <input id={id} className="field w-36 font-mono" value={shown} maxLength={7} spellCheck={false} autoComplete="off"
+      <input id={id} className="field w-32 font-mono" value={shown} maxLength={7} spellCheck={false} autoComplete="off"
         aria-invalid={bad} aria-describedby={bad ? `${id}-hint` : undefined}
         onChange={(e) => { setDraft(e.target.value); const hex = parseHex(e.target.value); if (hex) onChange(hex); }}
         onBlur={() => setDraft(null)} />
@@ -154,6 +157,8 @@ export function EmbedDesigner({ appUrl, agentId }: { appUrl: string; agentId: st
   const { style: typed, box } = saved;
   const style = useMemo(() => normalizeStyle(typed), [typed]); // what the preview and the code use
   const [mode, setMode] = useState<"button" | "box">("button");
+  const [panel, setPanel] = useState<(typeof PANELS)[number][0]>("look");
+  const [view, setView] = useState<"preview" | "live">("preview");
   const [device, setDevice] = useState<Device>("desktop");
   const [backdrop, setBackdrop] = useState<Backdrop>("light");
   const colorId = useId();
@@ -169,53 +174,74 @@ export function EmbedDesigner({ appUrl, agentId }: { appUrl: string; agentId: st
 
   const changed = JSON.stringify(style) !== JSON.stringify(DEFAULT_STYLE) || JSON.stringify(box) !== JSON.stringify(DEFAULT_BOX);
 
+  const tabBtn = (active: boolean) =>
+    `nav-pill px-3 py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-accent ${active ? "" : "text-muted hover:text-text"}`;
+
   return (
-    <section aria-labelledby="design-h" className="glass space-y-5 p-5">
+    <section aria-labelledby="design-h" className="glass space-y-4 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="design-h" className="text-lg font-medium">Design it and get the code</h2>
         <div role="tablist" aria-label="What to place on your website" className="flex gap-1">
           {(["button", "box"] as const).map((m) => (
             <button key={m} role="tab" type="button" aria-selected={mode === m} onClick={() => setMode(m)}
-              className={`nav-pill px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-accent ${mode === m ? "" : "text-muted hover:text-text"}`}
-              {...(mode === m ? { "aria-current": "true" } : {})}>
+              className={tabBtn(mode === m)} {...(mode === m ? { "aria-current": "true" } : {})}>
               {m === "button" ? "Floating button" : "Built into the page"}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)]">
-        <div className="space-y-4">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+        <div className="space-y-3">
           {mode === "button" ? (
             <>
-              <div>
-                <label className="label" htmlFor={labelId}>{style.shape === "orb" ? "Words beside the orb" : "Words on the button"}</label>
-                <input id={labelId} className="field" maxLength={40} value={typed.label} onChange={(e) => save({ style: { ...typed, label: e.target.value }, box })} />
+              <div role="tablist" aria-label="Part of the button to change" className="flex flex-wrap gap-1">
+                {PANELS.map(([key, name]) => (
+                  <button key={key} id={`${colorId}-tab-${key}`} role="tab" type="button" aria-selected={panel === key} aria-controls={`${colorId}-panel`}
+                    onClick={() => setPanel(key)} className={tabBtn(panel === key)} {...(panel === key ? { "aria-current": "true" } : {})}>{name}</button>
+                ))}
               </div>
-              <fieldset>
-                <legend className="label">Color</legend>
-                <div className="flex flex-wrap items-center gap-2">
-                  {SWATCHES.map((c) => (
-                    <button key={c} type="button" aria-label={`Color ${c}`} aria-pressed={style.color === c} onClick={() => up("color", c)}
-                      className={`size-8 rounded-full border-2 focus-visible:outline-2 focus-visible:outline-accent ${style.color === c ? "border-white" : "border-white/20"}`} style={{ background: c }} />
-                  ))}
-                  <label htmlFor={colorId} className="sr-only">Pick any color</label>
-                  <input id={colorId} type="color" value={style.color} onChange={(e) => up("color", e.target.value)} className="size-8 cursor-pointer rounded-full border-0 bg-transparent p-0" />
-                  <span className="text-xs text-faint">{style.color}</span>
-                </div>
-              </fieldset>
-              <HexField value={style.color} onChange={(hex) => up("color", hex)} />
-              <LogoField agentId={agentId} value={style.logo} onChange={(url) => up("logo", url)} />
-              <Choice legend="Where on the screen" value={style.position} options={POSITIONS} onChange={(v) => up("position", v)} />
-              <Choice legend="Shape" value={style.shape} options={SHAPES} onChange={(v) => up("shape", v)} />
-              {style.shape === "orb" && <p className="-mt-2 text-sm text-muted">A small glowing sphere that gently pulses, so visitors can tell something is listening. Your words show beside it when someone points at it, and once when the page first loads.</p>}
-              <Choice legend="Size" value={style.size} options={SIZES} onChange={(v) => up("size", v)} />
-              {style.shape !== "orb" && <Choice legend="Look" value={style.look} options={LOOKS} onChange={(v) => up("look", v)} />}
-              <Choice legend="Icon" value={style.icon} options={ICONS} onChange={(v) => up("icon", v)} />
-              <Choice legend="Distance from the edge" value={style.edge} options={EDGES} onChange={(v) => up("edge", v)} />
+              <div id={`${colorId}-panel`} role="tabpanel" aria-labelledby={`${colorId}-tab-${panel}`} className="min-h-[19rem] space-y-4">
+                {panel === "look" && (
+                  <>
+                    <div>
+                      <label className="label" htmlFor={labelId}>{style.shape === "orb" ? "Words beside the orb" : "Words on the button"}</label>
+                      <input id={labelId} className="field" maxLength={40} value={typed.label} onChange={(e) => save({ style: { ...typed, label: e.target.value }, box })} />
+                    </div>
+                    <fieldset>
+                      <legend className="label">Color</legend>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {SWATCHES.map((c) => (
+                          <button key={c} type="button" aria-label={`Color ${c}`} aria-pressed={style.color === c} onClick={() => up("color", c)}
+                            className={`size-7 rounded-full border-2 focus-visible:outline-2 focus-visible:outline-accent ${style.color === c ? "border-white" : "border-white/20"}`} style={{ background: c }} />
+                        ))}
+                        <label htmlFor={colorId} className="sr-only">Pick any color</label>
+                        <input id={colorId} type="color" value={style.color} onChange={(e) => up("color", e.target.value)} className="size-7 cursor-pointer rounded-full border-0 bg-transparent p-0" />
+                      </div>
+                      <div className="mt-2"><HexField value={style.color} onChange={(hex) => up("color", hex)} /></div>
+                    </fieldset>
+                    <LogoField agentId={agentId} value={style.logo} onChange={(url) => up("logo", url)} />
+                  </>
+                )}
+                {panel === "shape" && (
+                  <>
+                    <Choice legend="Shape" value={style.shape} options={SHAPES} onChange={(v) => up("shape", v)} />
+                    {style.shape === "orb" && <p className="-mt-2 text-sm text-muted">A small glowing sphere that gently pulses, so visitors can tell something is listening. Your words show beside it when someone points at it, and once when the page first loads.</p>}
+                    <Choice legend="Size" value={style.size} options={SIZES} onChange={(v) => up("size", v)} />
+                    {style.shape !== "orb" && <Choice legend="Look" value={style.look} options={LOOKS} onChange={(v) => up("look", v)} />}
+                    <Choice legend="Icon" value={style.icon} options={ICONS} onChange={(v) => up("icon", v)} />
+                  </>
+                )}
+                {panel === "place" && (
+                  <>
+                    <Choice legend="Where on the screen" value={style.position} options={POSITIONS} onChange={(v) => up("position", v)} />
+                    <Choice legend="Distance from the edge" value={style.edge} options={EDGES} onChange={(v) => up("edge", v)} />
+                  </>
+                )}
+              </div>
             </>
           ) : (
-            <>
+            <div className="min-h-[19rem] space-y-4">
               {([["width", "Width", 280, 900], ["height", "Height", 360, 900], ["radius", "Rounded corners", 0, 40]] as const).map(([k, label, lo, hi]) => (
                 <div key={k}>
                   <label className="label" htmlFor={`${colorId}-${k}`}>{label}: {box[k]}{k === "radius" ? "" : " pixels"}</label>
@@ -223,35 +249,55 @@ export function EmbedDesigner({ appUrl, agentId }: { appUrl: string; agentId: st
                 </div>
               ))}
               <p className="text-sm text-muted">The call box keeps its own dark look. Choose its size, and how round its corners are.</p>
-            </>
+            </div>
           )}
           {changed && (
             <button type="button" className="btn btn-quiet" onClick={() => save({ style: DEFAULT_STYLE, box: DEFAULT_BOX })}>Reset to the defaults</button>
           )}
         </div>
 
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Choice legend="Preview on" value={device} options={["desktop", "mobile"] as const} onChange={setDevice} />
-            <Choice legend="Page" value={backdrop} options={["light", "dark"] as const} onChange={setBackdrop} />
+        <div className="min-w-0 space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <Choice legend="Show" value={view} options={["preview", "live"] as const} onChange={setView} />
+            {view === "preview" && (
+              <>
+                <Choice legend="Preview on" value={device} options={["desktop", "mobile"] as const} onChange={setDevice} />
+                <Choice legend="Page" value={backdrop} options={["light", "dark"] as const} onChange={setBackdrop} />
+              </>
+            )}
           </div>
-          <div className="rounded-2xl border border-line bg-black/30 p-2">
-            <iframe
-              title="Preview of your website with the button on it"
-              sandbox="allow-scripts"
-              srcDoc={shownDoc}
-              className={`mx-auto block h-[30rem] rounded-xl border-0 bg-white ${device === "mobile" ? "w-[375px] max-w-full" : "w-full"}`}
-            />
-          </div>
-          <p className="text-xs text-faint">This is how it will look on a typical page. Click the button to see where the call box opens. In this preview, no call is started.</p>
+          {view === "preview" ? (
+            <>
+              <div className="rounded-2xl border border-line bg-black/30 p-2">
+                <iframe
+                  title="Preview of your website with the button on it"
+                  sandbox="allow-scripts"
+                  srcDoc={shownDoc}
+                  className={`mx-auto block h-[24rem] rounded-xl border-0 bg-white ${device === "mobile" ? "w-[375px] max-w-full" : "w-full"}`}
+                />
+              </div>
+              <p className="text-xs text-faint">This is how it will look on a typical page. Click the button to see where the call box opens. In this preview, no call is started.</p>
+            </>
+          ) : (
+            <>
+              <div className="rounded-2xl border border-line bg-black/30 p-2">
+                <iframe
+                  title="Your live call box"
+                  src={`/embed/${agentId}`}
+                  allow="microphone; autoplay"
+                  className="mx-auto block h-[24rem] w-full max-w-[26rem] rounded-xl border-0 bg-[#0b0d14]"
+                />
+              </div>
+              <p className="text-xs text-faint">This is the real agent, exactly what visitors get. Allow the microphone and talk to it. A test call is a real call: it costs the usual few cents a minute and counts toward your daily limit.</p>
+            </>
+          )}
+          {mode === "button" ? (
+            <CopyBox title="Your code: a floating button" hint="Paste this just before </body> on every page where the button should appear." code={scriptSnippet(appUrl, agentId, style)} />
+          ) : (
+            <CopyBox title="Your code: a call box built into the page" hint="Paste this where the call box should sit on the page." code={iframeSnippet(appUrl, agentId, box)} />
+          )}
         </div>
       </div>
-
-      {mode === "button" ? (
-        <CopyBox title="Your code: a floating button" hint="Paste this just before </body> on every page where the button should appear. It already includes your choices." code={scriptSnippet(appUrl, agentId, style)} />
-      ) : (
-        <CopyBox title="Your code: a call box built into the page" hint="Paste this where the call box should sit on the page." code={iframeSnippet(appUrl, agentId, box)} />
-      )}
     </section>
   );
 }

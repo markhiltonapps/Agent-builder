@@ -22,13 +22,12 @@ export default async function EmbedSettingsPage({ params }: PageProps<"/agents/[
   const appUrl = (process.env.APP_URL || `${proto}://${h.get("x-forwarded-host") ?? h.get("host")}`).replace(/\/$/, "");
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <Link href={`/agents/${id}`} className="link text-sm">← Back to editor</Link>
-      <h1 className="text-2xl font-semibold tracking-tight">Put {agent.name} on your website</h1>
-      <p className="max-w-2xl text-sm text-muted">
-        Visitors click a button, allow their microphone, and talk to the live version of this agent. Every call shows up
-        under Calls and on the Dashboard.
-      </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Put {agent.name} on your website</h1>
+        <p className="text-sm text-muted">Visitors click, allow their microphone, and talk to the live agent. Calls show under Calls and the Dashboard.</p>
+      </div>
       <EmbedForm
         agentId={agent.id}
         appUrl={appUrl}

@@ -150,22 +150,31 @@ export default function HelpPage() {
 
         <H id="website">Put it on a website</H>
         <P>
-          Open the agent and choose <B>Put on website</B>. Switch it on and save. Then design what visitors will see: the words
-          on the button, its <B>color</B> (pick a swatch or type your own hex code, like #0f766e), <B>shape</B>, <B>size</B>, <B>icon</B>,
-          how it looks (solid, glass or outline), and where it sits on the screen. You can also <B>upload your logo</B> and it shows
-          as a small round badge on the button. For something different, choose the <B>Glowing orb</B> shape: a small sphere that
-          softly pulses so visitors can tell something intelligent is listening. Your words appear beside it when someone points at it. The preview beside the controls is a mock website running the real button, so what you see is what
-          visitors get. Switch the preview between a computer and a phone screen, and between a light and a dark page.
+          Open the agent and choose <B>Put on website</B>. The bar at the top shows whether website calls are on. Choose
+          <B> Change</B> to switch them on, say which websites may show your agent (optional), set a daily limit, and save. Then
+          design what visitors will see. Everything fits on one screen: the controls are on the left in three tabs, and the
+          preview and your code are on the right.
         </P>
-        <Shot name="embed" height={1100} alt="The Put on website page with the button designer and a live preview"
-          caption="1: the words on the button. 2: where it sits. 3: the live preview. Below the preview is your code, with your choices already in it." />
+        <Shot name="embed" height={960} alt="The Put on website page: access bar, design tabs, live preview and the code"
+          caption="1: website calls on or off. 2: the design tabs. 3: switch between the preview and a real call. 4: the live preview. 5: your code, with your choices already in it." />
+        <Steps>
+          <li><B>Words, color, logo:</B> the words on the button, its color (pick a swatch or type your own hex code, like #0f766e), and an optional logo. Upload a PNG, JPG or WebP under 512 KB and it shows as a small round badge.</li>
+          <li><B>Shape and size:</B> pill, rounded, square, round, or the <B>Glowing orb</B>: a small sphere that softly pulses so visitors can tell something intelligent is listening. Your words appear beside the orb when someone points at it. Also size, look (solid, glass or outline) and an icon.</li>
+          <li><B>Position:</B> where it sits on the screen and how far from the edge.</li>
+        </Steps>
+        <P>
+          The preview is a mock website running the real button, so what you see is what visitors get. Switch it between a
+          computer and a phone screen, and between a light and a dark page. To test the real thing without leaving the page,
+          choose <B>Try a real call</B> above the preview. The live call box appears right there: allow your microphone and talk
+          to your agent. A test call is a real call, so it costs the usual few cents a minute and counts toward your daily limit.
+        </P>
         <P>
           When it looks right, copy the code and paste it into the website just before the closing body tag. You can also choose
           <B> Built into the page</B> to place the call box right inside a page instead of floating. Visitors click, allow their
           microphone, and talk to the live agent. Their calls show up under Calls and on the Dashboard, marked Website.
         </P>
         <Tip>
-          The preview never starts a call, so you can click around freely. Your design is remembered in this browser, so you
+          The preview never starts a call, so you can click around freely (only <B>Try a real call</B> does). Your design is remembered in this browser, so you
           can come back and adjust it later. Codes you pasted earlier keep working exactly as they were.
         </Tip>
         <Tip>
