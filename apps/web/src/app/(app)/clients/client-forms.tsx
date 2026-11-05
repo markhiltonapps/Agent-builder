@@ -70,7 +70,7 @@ export function VotelPicker() {
   const drop = async (c: VotelClient, mode: "untag" | "delete") => {
     const ok = await askConfirm(
       mode === "delete"
-        ? { title: `Delete ${c.name} in Votel?`, body: "This deletes the contact in Votel. Votel keeps deleted contacts so they can be recovered, but they disappear from your lists.", confirmLabel: "Delete contact", tone: "danger" }
+        ? { title: `Delete ${c.name} in Votel?`, body: "This deletes the contact in Votel. It disappears everywhere there, and Votel's app has no way to restore it. Its running workflows are cancelled and any recurring billing on it is ended. To keep the contact, choose Remove tag instead.", confirmLabel: "Delete contact", tone: "danger" }
         : { title: `Take ${c.name} off the client list?`, body: "This only removes the agent-builder-client tag in Votel. The contact and its history stay.", confirmLabel: "Remove tag" },
     );
     if (!ok) return;
@@ -225,7 +225,7 @@ export function RemoveClient({ accountId, name, linked }: { accountId: string; n
           {linked && (
             <fieldset className="space-y-1">
               <legend className="label">What about its contact in Votel?</legend>
-              {([["keep", "Leave it as it is"], ["untag", "Take off the agent-builder-client tag (keeps the contact and its history)"], ["delete", "Delete the contact in Votel (Votel can recover it)"]] as const).map(([v, label]) => (
+              {([["keep", "Leave it as it is"], ["untag", "Take off the agent-builder-client tag (keeps the contact and its history)"], ["delete", "Delete the contact in Votel (it cannot be restored from Votel's app)"]] as const).map(([v, label]) => (
                 <label key={v} className="flex cursor-pointer items-start gap-2 py-0.5 text-sm">
                   <input type="radio" name={`${id}-votel`} value={v} checked={mode === v} onChange={() => setMode(v)} className="mt-0.5 size-4" />
                   <span>{label}</span>

@@ -179,7 +179,7 @@ async def remove_client(cfg: VotelConfig, contact_id: str, mode: str) -> str:
     """Take a client's contact out of the client list in Votel. Returns "done" or "gone".
 
     ``mode`` is "untag" (remove the client tag, keep the contact and its history) or "delete"
-    (Votel's own delete, which it can recover). Only a contact that carries the client tag is
+    (Votel's own delete: hidden everywhere, no restore in its app, workflows cancelled). Only a contact that carries the client tag is
     touched: this can never be used to delete an ordinary contact.
     """
     if mode not in ("untag", "delete"):

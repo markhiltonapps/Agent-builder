@@ -106,7 +106,7 @@ export default function HelpPage() {
           you must be its owner). It deletes the client here: its agents, calls and settings, so download its usage first if you
           need it for billing. You type the client&apos;s name to confirm, and if it is linked to Votel you choose what happens to
           its contact: <B>leave it</B>, <B>take off the agent-builder-client tag</B> (the contact and its history stay), or
-          <B> delete it</B> (Votel keeps deleted contacts so they can be recovered). Nothing is removed here unless the Votel step succeeded.
+          <B> delete it</B> (it disappears everywhere in Votel and its app cannot restore it; running workflows on it are cancelled and any recurring billing ended, so take off the tag instead if you may need it again). Nothing is removed here unless the Votel step succeeded.
         </P>
         <P>
           In <B>Add from Votel</B>, each contact found also has <B>Remove tag</B> and <B>Delete in Votel</B>. These only ever act on
