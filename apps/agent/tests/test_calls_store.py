@@ -59,6 +59,7 @@ def test_call_row_maps_the_record_and_computes_the_end():
 
 def test_source_comes_from_the_room_name():
     assert source_for("talk-abc-123") == "browser"
+    assert source_for("web-11111111-abcd1234") == "web"
     assert source_for("call-+15125550100_xyz") == "phone"
 
 

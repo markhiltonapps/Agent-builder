@@ -22,6 +22,7 @@ from typing import Any
 from aiohttp import web
 from pydantic import ValidationError
 
+from . import embed
 from .compiler import compile_agent
 from .config import AgentConfig
 from .draft import DraftError, draft
@@ -163,6 +164,32 @@ async def directory_sync(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "result": synced.result, "task_id": synced.task_id})
 
 
+async def embed_info(request: web.Request) -> web.Response:
+    """GET ?agent_id= -> the embed's public name and which websites may show it."""
+    try:
+        found = await embed.info(request.query.get("agent_id", ""))
+    except embed.EmbedError:
+        return web.json_response({"error": "unavailable"}, status=502)
+    if found is None:
+        return web.json_response({"error": "not found"}, status=404)
+    return web.json_response(found.to_json())
+
+
+async def embed_begin(request: web.Request) -> web.Response:
+    """POST {"agent_id"} -> {"status": "ok" | "disabled" | "unpublished" | "limit"}. 'ok' counts a call."""
+    try:
+        body = await request.json()
+        agent_id = str(body["agent_id"])
+    except (ValueError, KeyError, TypeError):
+        raise web.HTTPBadRequest(
+            text='{"error": "agent_id is required"}', content_type="application/json"
+        ) from None
+    try:
+        return web.json_response({"status": await embed.begin(agent_id)})
+    except embed.EmbedError:
+        return web.json_response({"error": "unavailable"}, status=502)
+
+
 async def schema(_request: web.Request) -> web.Response:
     return web.json_response(AgentConfig.model_json_schema())
 
@@ -189,6 +216,8 @@ def make_app(secret: str) -> web.Application:
     app.router.add_post("/v1/directory/sync", directory_sync)
     app.router.add_post("/v1/draft", draft_new)
     app.router.add_post("/v1/revise", draft_revise)
+    app.router.add_get("/v1/embed/info", embed_info)
+    app.router.add_post("/v1/embed/begin", embed_begin)
     app.router.add_get("/v1/schema", schema)
     app.router.add_get("/healthz", healthz)
     return app

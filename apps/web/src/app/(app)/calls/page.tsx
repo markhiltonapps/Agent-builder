@@ -56,7 +56,7 @@ export default async function CallsPage({ searchParams }: PageProps<"/calls">) {
                   <span className="flex flex-wrap items-center gap-2 text-sm">
                     {c.goal_reached && <span className="chip chip-live">Successful</span>}
                     {c.transferred && <span className="chip">Transferred</span>}
-                    <span className="chip">{c.source === "phone" ? "Phone" : "Test call"}</span>
+                    <span className="chip">{c.source === "phone" ? "Phone" : c.source === "web" ? "Website" : "Test call"}</span>
                     <span className="chip" title="Agent version">Version {c.agent_version ?? "?"}</span>
                     <span className="w-14 text-right tabular-nums text-muted">{duration(Number(c.duration_s))}</span>
                   </span>

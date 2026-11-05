@@ -173,6 +173,7 @@ export function Editor({ agent, initial, latest, published, notice }: Props) {
             <div className="-ml-3 mt-1 flex flex-wrap items-center">
               <Link href={`/agents/${agent.id}/versions`} onClick={leaveGuard} className="btn btn-quiet underline underline-offset-4">Version history</Link>
               <Link href={`/agents/${agent.id}/talk`} onClick={leaveGuard} className="btn btn-quiet underline underline-offset-4">Test call</Link>
+              <Link href={`/agents/${agent.id}/embed`} onClick={leaveGuard} className="btn btn-quiet underline underline-offset-4">Put on website</Link>
               <Link href={`/calls?agent=${agent.id}`} onClick={leaveGuard} className="btn btn-quiet underline underline-offset-4">Past calls</Link>
               <form
                 className="ml-2"

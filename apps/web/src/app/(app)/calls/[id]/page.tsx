@@ -35,7 +35,7 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
           <LocalTime iso={call.started_at} />
           <span className="chip">{duration(Number(call.duration_s))}</span>
           <span className="chip">Version {call.agent_version ?? "?"}</span>
-          <span className="chip">{call.source === "phone" ? "Phone" : "Test call"}</span>
+          <span className="chip">{call.source === "phone" ? "Phone" : call.source === "web" ? "Website" : "Test call"}</span>
           {call.goal_reached && <span className="chip chip-live">Successful</span>}
           {call.transferred && <span className="chip">Transferred{call.transfer_reason ? `: ${call.transfer_reason}` : ""}</span>}
           {call.votel_synced_at && <span className="chip chip-live">In Votel CRM</span>}

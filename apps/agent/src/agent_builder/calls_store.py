@@ -73,7 +73,10 @@ def call_row(
 
 
 def source_for(room: str) -> str:
-    return "browser" if room.startswith("talk-") else "phone"
+    """talk- is a builder test call, web- a visitor on an embedded website, else a phone call."""
+    if room.startswith("talk-"):
+        return "browser"
+    return "web" if room.startswith("web-") else "phone"
 
 
 async def save_call(

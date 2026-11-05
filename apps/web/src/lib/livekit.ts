@@ -31,3 +31,26 @@ export async function callToken(opts: { agentId: string; userId: string }) {
   });
   return { url: need("LIVEKIT_URL"), token: await at.toJwt(), room };
 }
+
+/**
+ * A short token for one anonymous visitor on an embedded website. Same dispatch as a test
+ * call, but the room starts with "web-" so the call is saved as a website call, and the token
+ * lives only as long as one call may last.
+ */
+export async function visitorToken(opts: { agentId: string }) {
+  const room = `web-${opts.agentId.slice(0, 8)}-${crypto.randomUUID().slice(0, 8)}`;
+  const at = new AccessToken(need("LIVEKIT_API_KEY"), need("LIVEKIT_API_SECRET"), {
+    identity: `visitor-${crypto.randomUUID().slice(0, 12)}`,
+    ttl: "15m",
+  });
+  at.addGrant({ room, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: false });
+  at.roomConfig = new RoomConfiguration({
+    agents: [
+      new RoomAgentDispatch({
+        agentName: WORKER_NAME,
+        metadata: JSON.stringify({ agent_id: opts.agentId }),
+      }),
+    ],
+  });
+  return { url: need("LIVEKIT_URL"), token: await at.toJwt(), room };
+}

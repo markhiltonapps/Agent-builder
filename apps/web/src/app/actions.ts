@@ -5,6 +5,8 @@ import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { compileConfig, draftConfig, reviseConfig } from "@/lib/builder-api";
 import { pushCard } from "@/lib/directory";
+import { MAX_SITES, parseSites } from "@/lib/embed-code";
+import { forgetEmbedInfo } from "@/lib/embed-info";
 import { callToken } from "@/lib/livekit";
 import type { Compiled, ValidationIssue } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -267,4 +269,32 @@ export async function syncAllToVotel(): Promise<SyncState> {
   return {
     message: `Sent ${sent} agent${sent === 1 ? "" : "s"} to the Agent Builder OS board in Votel.` + (sent < agents.length ? ` ${agents.length - sent} didn't go through.` : ""),
   };
+}
+
+// --- website embed ---------------------------------------------------------------------
+
+export type EmbedSaveResult = { ok: true; sites: string[] } | { ok: false; error: string };
+
+/** Turn the website embed on or off for an agent, and say which sites may show it. */
+export async function saveEmbed(agentId: string, enabled: boolean, sitesText: string, dailyLimit: number): Promise<EmbedSaveResult> {
+  const { sites, bad } = parseSites(sitesText);
+  if (bad.length) {
+    return { ok: false, error: `These don't look like website addresses: ${bad.slice(0, 3).join(", ")}. Use something like example.com.` };
+  }
+  if (sites.length > MAX_SITES) return { ok: false, error: `Use at most ${MAX_SITES} websites.` };
+  if (enabled && sites.length === 0) return { ok: false, error: "Add the website where you'll place it first." };
+  const limit = Math.round(Number(dailyLimit));
+  if (!(limit >= 1 && limit <= 2000)) return { ok: false, error: "Choose a daily limit between 1 and 2000 calls." };
+
+  const supabase = await supabaseServer();
+  const { error } = await supabase.rpc("set_embed_settings", {
+    p_agent: agentId,
+    p_enabled: enabled,
+    p_origins: sites,
+    p_limit: limit,
+  });
+  if (error) return { ok: false, error: "We couldn't save that. You may not have edit access to this agent." };
+  forgetEmbedInfo(agentId);
+  revalidatePath(`/agents/${agentId}/embed`);
+  return { ok: true, sites };
 }

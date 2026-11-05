@@ -15,12 +15,12 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   const sp = await searchParams;
   const days = parseDays(sp.days);
-  const phoneOnly = sp.source === "phone";
+  const customersOnly = sp.source === "customers";
   const tz = safeTimeZone((await cookies()).get("tz")?.value);
 
   const supabase = await supabaseServer();
   const [{ data: stats }, { data: recent }, { data: accounts }] = await Promise.all([
-    supabase.rpc("dashboard_stats", { p_days: days, p_phone_only: phoneOnly, p_tz: tz }),
+    supabase.rpc("dashboard_stats", { p_days: days, p_phone_only: customersOnly, p_tz: tz }),
     supabase
       .from("calls")
       .select("id, started_at, duration_s, goal_reached, transferred, summary, agent:agents(name)")
@@ -31,7 +31,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   if (!accounts?.length) redirect("/agents"); // a new person names their workspace there first
   const s = stats as DashboardStats | null;
 
-  const href = (d: number, phone: boolean) => `/dashboard?days=${d}${phone ? "&source=phone" : ""}`;
+  const href = (d: number, customers: boolean) => `/dashboard?days=${d}${customers ? "&source=customers" : ""}`;
   const pill = (active: boolean) =>
     `rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
       active ? "bg-white/10 text-text" : "text-muted hover:text-text"
@@ -48,14 +48,14 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         <div className="flex flex-wrap gap-x-4 gap-y-2">
           <nav aria-label="Time period" className="flex gap-1">
             {PERIODS.map((d) => (
-              <Link key={d} href={href(d, phoneOnly)} aria-current={d === days ? "true" : undefined} className={pill(d === days)}>
+              <Link key={d} href={href(d, customersOnly)} aria-current={d === days ? "true" : undefined} className={pill(d === days)}>
                 Last {d} days
               </Link>
             ))}
           </nav>
           <nav aria-label="Which calls" className="flex gap-1">
-            <Link href={href(days, false)} aria-current={!phoneOnly ? "true" : undefined} className={pill(!phoneOnly)}>All calls</Link>
-            <Link href={href(days, true)} aria-current={phoneOnly ? "true" : undefined} className={pill(phoneOnly)}>Phone calls only</Link>
+            <Link href={href(days, false)} aria-current={!customersOnly ? "true" : undefined} className={pill(!customersOnly)}>All calls</Link>
+            <Link href={href(days, true)} aria-current={customersOnly ? "true" : undefined} className={pill(customersOnly)}>Customer calls only</Link>
           </nav>
         </div>
       </div>
@@ -64,7 +64,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         <p role="alert" className="glass p-6 text-muted">We couldn&apos;t load the numbers. Refresh the page, or try again in a minute.</p>
       ) : s.totals.calls === 0 ? (
         <p className="glass p-6 text-muted">
-          No {phoneOnly ? "phone " : ""}calls in the last {days} days. Open an agent and choose{" "}
+          No {customersOnly ? "customer " : ""}calls in the last {days} days. Open an agent and choose{" "}
           <strong className="font-medium text-text">Test call</strong> to see numbers appear here.
         </p>
       ) : (
