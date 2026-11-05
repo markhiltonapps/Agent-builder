@@ -144,13 +144,29 @@ def test_the_gemini_model_is_built_only_with_a_key(monkeypatch):
     assert model.model == "gemini-3.1-flash-live-preview"
 
 
+class FakeHandle:
+    def __init__(self, error=None):
+        self._error = error
+
+    def exception(self):
+        return self._error
+
+    def __await__(self):
+        async def done():
+            return self
+
+        return done().__await__()
+
+
 class FakeSession:
-    def __init__(self):
-        self.replies: list[str] = []
+    def __init__(self, outcomes=()):
+        self.outcomes = list(outcomes)  # per call: None for success, an exception for a failure
+        self.calls: list[dict] = []
         self.handlers: dict[str, list] = {}
 
-    def generate_reply(self, *, instructions: str):
-        self.replies.append(instructions)
+    def generate_reply(self, *, instructions=None, user_input=None):
+        self.calls.append({"instructions": instructions, "user_input": user_input})
+        return FakeHandle(self.outcomes.pop(0) if self.outcomes else None)
 
     def on(self, event: str, cb):
         self.handlers.setdefault(event, []).append(cb)
@@ -163,47 +179,55 @@ class FakeSession:
             cb(ev)
 
 
-@pytest.fixture
-def greeting(monkeypatch):
+def _agent(monkeypatch, outcomes=(), single_model=True):
     from agent_builder import worker
 
-    monkeypatch.setattr(worker, "GREETING_RETRY_S", 0.05)
-    fake = FakeSession()
+    monkeypatch.setattr(worker, "GREETING_RETRY_S", 0.01)
+    fake = FakeSession(outcomes)
     monkeypatch.setattr(worker.BuilderAgent, "session", property(lambda self: fake))
     compiled = compile_agent(load_file(DEFAULT_CONFIG))
-    return worker, fake, compiled
+    return worker.BuilderAgent(compiled, [], single_model=single_model), fake, compiled
 
 
-async def test_a_backup_voice_that_stays_silent_is_asked_for_its_greeting_again(greeting):
-    import asyncio
+async def _settle(agent):
+    if agent._watchdog:
+        await agent._watchdog
 
-    worker, fake, compiled = greeting
-    agent = worker.BuilderAgent(compiled, [], single_model=True)
+
+async def test_a_greeting_that_works_is_asked_for_once(monkeypatch):
+    agent, fake, compiled = _agent(monkeypatch)
     await agent.on_enter()
-    await asyncio.sleep(0.3)
-    assert len(fake.replies) == 3  # the first ask and two retries, then it stops
-    assert all(compiled.opening_line in r for r in fake.replies)
+    await _settle(agent)
+    assert len(fake.calls) == 1 and compiled.opening_line in fake.calls[0]["instructions"]
 
 
-async def test_once_the_agent_has_spoken_the_greeting_is_not_repeated(greeting):
-    import asyncio
-
-    worker, fake, compiled = greeting
-    agent = worker.BuilderAgent(compiled, [], single_model=True)
+async def test_a_failed_greeting_is_asked_again_and_the_last_try_is_a_plain_hello(monkeypatch):
+    agent, fake, compiled = _agent(monkeypatch, outcomes=[RuntimeError("x"), RuntimeError("y")])
     await agent.on_enter()
-    fake.fire("agent_state_changed", "listening")  # just getting ready: not a greeting
-    await asyncio.sleep(0.07)
-    assert len(fake.replies) == 2  # so it still asked again
-    fake.fire("agent_state_changed", "speaking")
-    await asyncio.sleep(0.25)
-    assert len(fake.replies) == 2  # and stopped asking once it spoke
+    await _settle(agent)
+    assert len(fake.calls) == 3
+    assert all(compiled.opening_line in c["instructions"] for c in fake.calls[:2])
+    assert fake.calls[2] == {"instructions": None, "user_input": "Hello?"}
 
 
-async def test_the_main_voice_greets_once_with_no_watchdog(greeting):
-    import asyncio
-
-    worker, fake, compiled = greeting
-    agent = worker.BuilderAgent(compiled, [])
+async def test_the_retries_stop_as_soon_as_the_greeting_works(monkeypatch):
+    agent, fake, _ = _agent(monkeypatch, outcomes=[RuntimeError("x")])
     await agent.on_enter()
-    await asyncio.sleep(0.25)
-    assert len(fake.replies) == 1 and fake.handlers == {}
+    await _settle(agent)
+    assert len(fake.calls) == 2  # the second one succeeded
+
+
+async def test_a_caller_who_speaks_first_is_not_greeted_over(monkeypatch):
+    agent, fake, _ = _agent(monkeypatch, outcomes=[RuntimeError("x")])
+    await agent.on_enter()
+    fake.fire("user_state_changed", "listening")  # not speaking: does not count
+    assert agent._heard is False
+    fake.fire("user_state_changed", "speaking")
+    await _settle(agent)
+    assert len(fake.calls) == 0  # the caller got there first, so there is nothing to greet over
+
+
+async def test_the_main_voice_greets_once_and_adds_no_watchdog(monkeypatch):
+    agent, fake, _ = _agent(monkeypatch, single_model=False)
+    await agent.on_enter()
+    assert len(fake.calls) == 1 and fake.handlers == {} and agent._watchdog is None
