@@ -23,6 +23,7 @@ For the owner, in plain words. Start at "First five minutes". Nothing here needs
 | A call is missing from **Calls** | Wait two minutes (work after a call is retried automatically). If still missing, see "Unfinished work" below. |
 | Call is in **Calls** but "Votel sync failed" | Retried automatically, up to eight times over about a day. It almost always means Votel was down or the key changed. |
 | Website chat says it is busy or cannot connect | Check **builder-api** in Railway. Chats are kept in the database, so a restart loses nothing; the visitor just retries. |
+| An agent ignores its documents | Open **Knowledge**: is the document listed, and does its scope include that agent ("Every agent" or the agent named)? Changes apply to the *next* call or chat. If the knowledge is large the agent searches it ("Let me check"); a database outage makes it say it cannot look that up. |
 | Dashboard or embed will not load | Check **web** in Railway. |
 | Everything broke right after a deploy | Railway, the broken service, **Deployments**, find the last good one, **Rollback**. One click. |
 | Sign-in or sign-up emails not arriving | Check Resend (resend.com, Emails) for the send, and Supabase, Authentication, Emails. See "Email safety" in CLAUDE.md before testing anything. |

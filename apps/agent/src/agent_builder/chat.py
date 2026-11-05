@@ -37,6 +37,7 @@ from .adapters import Adapter, restore_adapters, snapshot_adapters
 from .chat_store import ChatStore, default_store
 from .compiler import CompiledAgent, compile_agent
 from .finish_queue import finish_call
+from .knowledge import Knowledge, Searcher, apply_knowledge, knowledge_tools, load_knowledge
 from .loader import LoadedConfig, published_source
 from .tools import CallRecorder, build_tools
 
@@ -128,6 +129,7 @@ def _text_of(output: list[dict[str, Any]]) -> str:
 
 Finish = Callable[[LoadedConfig, dict[str, Any]], Awaitable[None]]
 Load = Callable[[str], Awaitable[LoadedConfig]]
+LoadKnowledge = Callable[[str | None], Awaitable[Knowledge | None]]
 
 
 class ChatService:
@@ -141,6 +143,8 @@ class ChatService:
         load: Load | None = None,
         begin: Callable[[str, str], Awaitable[str]] = embed.begin,
         store: ChatStore | None = None,
+        knowledge: LoadKnowledge = load_knowledge,
+        searcher: Searcher | None = None,
         key: str | None = None,
         base_url: str | None = None,
         model: str | None = None,
@@ -151,6 +155,8 @@ class ChatService:
         self._load = load or (lambda agent_id: published_source().load(agent_id))
         self._begin = begin
         self._store = store or default_store()
+        self._knowledge = knowledge
+        self._searcher = searcher
         self._key = key
         self._base = base_url
         self._model = model
@@ -164,13 +170,18 @@ class ChatService:
     # --- building and saving a session -------------------------------------------------------
 
     def _build(
-        self, loaded: LoadedConfig, session_id: str, saved: dict[str, Any] | None
+        self,
+        loaded: LoadedConfig,
+        session_id: str,
+        saved: dict[str, Any] | None,
+        knowledge: Knowledge | None = None,
     ) -> Session:
         """A session for ``loaded``, fresh or restored from what the database holds."""
         cfg = loaded.config
-        compiled = compile_agent(cfg, now=datetime.now(UTC))
+        compiled = apply_knowledge(compile_agent(cfg, now=datetime.now(UTC)), knowledge)
         recorder = CallRecorder()
         tools, adapters = build_tools(cfg, compiled, recorder, caller=lambda: None)
+        tools.extend(knowledge_tools(loaded.agent_id, knowledge, recorder, self._searcher))
         by_name, specs = tool_specs(tools)
         now = self._clock()
         s = Session(
@@ -258,7 +269,7 @@ class ChatService:
             raise ChatError("unpublished") from e
         except (aiohttp.ClientError, TimeoutError, RuntimeError) as e:
             raise ChatError("try_again") from e
-        s = self._build(loaded, session_id, saved)
+        s = self._build(loaded, session_id, saved, await self._knowledge(loaded.agent_id))
         self.sessions[session_id] = s
         return s
 
@@ -281,7 +292,9 @@ class ChatService:
         except (aiohttp.ClientError, TimeoutError, RuntimeError) as e:
             raise ChatError("try_again") from e
 
-        session = self._build(loaded, uuid.uuid4().hex, None)
+        session = self._build(
+            loaded, uuid.uuid4().hex, None, await self._knowledge(loaded.agent_id)
+        )
         self.sessions[session.id] = session
         await self._save(session)
         return session.id, session.compiled.opening_line

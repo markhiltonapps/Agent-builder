@@ -36,6 +36,7 @@ from livekit.agents.beta.tools import EndCallTool
 from .adapters import restore_adapters, snapshot_adapters
 from .compiler import CompiledAgent, compile_agent
 from .finish_queue import finish_call as queue_finish
+from .knowledge import apply_knowledge, knowledge_tools, load_knowledge
 from .loader import ROOT, resolve_config
 from .preflight import run as run_preflight
 from .providers import build_voice_model
@@ -204,6 +205,8 @@ async def entrypoint(ctx: JobContext) -> None:
     loaded = await resolve_config(ctx.job.metadata)
     cfg = loaded.config
     compiled = compile_agent(cfg, now=datetime.now(UTC))
+    knowledge = await load_knowledge(loaded.agent_id)
+    compiled = apply_knowledge(compiled, knowledge)
     recorder = CallRecorder()
     caller: dict[str, str | None] = {"number": None}
 
@@ -217,6 +220,7 @@ async def entrypoint(ctx: JobContext) -> None:
     ctx.room.on("participant_attributes_changed", note_caller)
     note_caller()
     tools, adapters = build_tools(cfg, compiled, recorder, lambda: caller_number())
+    tools.extend(knowledge_tools(loaded.agent_id, knowledge, recorder))
     tools.append(EndCallTool(end_instructions=None, ignore_on_enter=True))
     store = store_from_env(CONVERSATION_DIR)
 

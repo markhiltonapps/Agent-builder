@@ -8,6 +8,7 @@ const SECTIONS = [
   ["clients", "Clients"],
   ["pick", "Pick a ready-made agent"],
   ["edit", "Make it yours"],
+  ["knowledge", "Give your agent knowledge"],
   ["test", "Test it"],
   ["publish", "Put it live"],
   ["website", "Put it on a website"],
@@ -167,6 +168,34 @@ export default function HelpPage() {
         </P>
         <Shot name="unsaved" height={260} alt="The editor header showing Unsaved changes and a Save changes button"
           caption="1: when you change something, Save changes lights up. Saving makes a new version; it doesn't go live yet." />
+
+        <H id="knowledge">Give your agent knowledge</H>
+        <P>
+          Open <B>Knowledge</B> in the top bar. This is where you put the facts your agents answer from: prices, opening hours,
+          services, policies and the answers to questions callers ask again and again. Each client has its own knowledge, so
+          what you add for one client is never heard by another.
+        </P>
+        <Steps>
+          <li>Choose <B>Choose files</B>, or drop files onto the box. Markdown (<B>.md</B>) and plain text (<B>.txt</B>) both work, up to 200 KB each, and you can add several at once. Or open <B>Or write a document here</B> and type or paste it.</li>
+          <li>Each document appears in the list, with its size and which agents use it. Click one to read or change its text.</li>
+          <li>On a document&apos;s page, choose <B>Every agent for this client</B> or <B>Only the ones I choose</B>, then <B>Save changes</B>.</li>
+        </Steps>
+        <P>
+          There is nothing to publish. The next call or chat uses what is in the list, and deleting a document stops it being used
+          right away. To check it, ask the agent a question from the document in a test call or in the chat.
+        </P>
+        <Tip>
+          Write it the way you want it said. Use headings (lines that start with <B>#</B>) for each topic, keep one subject
+          to a document, and put exact figures in, such as &ldquo;Teeth cleaning: $99, about 45 minutes&rdquo;. If the answer isn&apos;t in
+          your documents, the agent says it doesn&apos;t have that information and offers to take a message, so it never makes
+          something up.
+        </Tip>
+        <P>
+          How it works: when a client&apos;s documents add up to about five pages or less, the agent is given all of them at the
+          start of every call, so it answers straight away. When there is more than that, the agent looks things up while it
+          talks, saying a short &ldquo;Let me check&rdquo; first, and uses only the parts that match the question. A client can keep up to
+          100 documents, about 3 MB in all.
+        </P>
 
         <H id="test">Test it</H>
         <P>

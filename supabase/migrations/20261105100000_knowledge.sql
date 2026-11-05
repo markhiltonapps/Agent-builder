@@ -14,6 +14,7 @@ create table if not exists public.knowledge_docs (
   title       text not null check (length(title) between 1 and 200),
   filename    text not null default '' check (length(filename) <= 200),
   content     text not null check (length(content) between 1 and 200000),
+  chars       integer generated always as (length(content)) stored,
   agent_ids   uuid[],
   created_by  uuid references auth.users (id) on delete set null,
   created_at  timestamptz not null default now(),
