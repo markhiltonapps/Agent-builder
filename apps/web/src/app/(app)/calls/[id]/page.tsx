@@ -79,7 +79,7 @@ export default async function CallPage({ params }: PageProps<"/calls/[id]">) {
                                     <span className="text-xs text-faint">{t.latency_ms} ms</span>
                 </div>
                 <p className="mt-2 break-words font-mono text-xs text-muted">
-                  {Object.entries(t.args).map(([k, v]) => `${k}=${String(v)}`).join("  ") || "no inputs"}
+                  {Object.entries(t.args ?? {}).map(([k, v]) => `${k}=${String(v)}`).join("  ") || "no inputs"}
                 </p>
               </li>
             ))}

@@ -10,13 +10,14 @@ const LINKS = [
   { href: "/clients", label: "Clients" },
   { href: "/calls", label: "Calls" },
   { href: "/numbers", label: "Numbers" },
+  { href: "/help", label: "Help" },
 ];
 
 export function NavLinks() {
   const path = usePathname();
   const router = useRouter();
   return (
-    <nav aria-label="Main" className="ml-0 mr-auto flex min-w-0 gap-0 text-[0.8125rem] sm:ml-6 sm:gap-1 sm:text-sm">
+    <nav aria-label="Main" className="ml-0 mr-auto flex min-w-0 gap-0 overflow-x-auto text-[0.8125rem] sm:ml-6 sm:gap-1 sm:text-sm">
       {LINKS.map((l) => {
         const active = path === l.href || path.startsWith(`${l.href}/`);
         return (
