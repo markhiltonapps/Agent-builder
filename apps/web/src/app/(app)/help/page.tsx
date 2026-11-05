@@ -155,7 +155,7 @@ export default function HelpPage() {
           design what visitors will see. Everything fits on one screen: the controls are on the left in three tabs, and the
           preview and your code are on the right.
         </P>
-        <Shot name="embed" height={960} alt="The Put on website page: access bar, design tabs, live preview and the code"
+        <Shot name="embed" height={1020} alt="The Put on website page: access bar, design tabs, live preview and the code"
           caption="1: website calls on or off. 2: the design tabs. 3: switch between the preview and a real call. 4: the live preview. 5: your code, with your choices already in it." />
         <Steps>
           <li><B>Words, color, logo:</B> the words on the button, its color (pick a swatch or type your own hex code, like #0f766e), and an optional logo. Upload a PNG, JPG or WebP under 512 KB and it shows as a small round badge.</li>
