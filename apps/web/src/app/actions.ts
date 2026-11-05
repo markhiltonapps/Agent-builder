@@ -10,7 +10,7 @@ import { forgetEmbedInfo } from "@/lib/embed-info";
 import { callToken } from "@/lib/livekit";
 import type { Compiled, ValidationIssue } from "@/lib/config";
 import { supabaseServer } from "@/lib/supabase/server";
-import { TEMPLATES } from "@/lib/templates";
+import { DEFAULT_TIME_ZONE, TIME_ZONES, applyTemplate, findTemplate } from "@/lib/template-library";
 
 export type FormState = { error?: string; notice?: string; email?: string } | undefined;
 
@@ -86,31 +86,41 @@ export async function createAccount(_: FormState, form: FormData): Promise<FormS
 export async function createAgent(_: FormState, form: FormData): Promise<FormState> {
   const name = text(form, "name");
   const accountId = text(form, "account_id");
-  if (!name) return { error: "Give the agent a name and choose how to start." };
+  if (!name) return { error: "Give the agent a name first." };
 
-  // Start from a template, or let AI draft the agent from a plain description.
-  let config: unknown;
-  let note: string;
-  if (text(form, "mode") === "ai") {
-    const description = text(form, "description");
-    if (description.length < 30) {
-      return { error: "Tell us a little more about the business: what it does, when it is open, and why people call." };
-    }
-    const drafted = await draftConfig(description);
-    if (!drafted.ok) return { error: drafted.error };
-    config = drafted.config;
-    note = "Drafted by AI from your description";
-  } else {
-    const template = TEMPLATES.find((t) => t.key === text(form, "template"));
-    if (!template) return { error: "Give the agent a name and choose how to start." };
-    config = template.config;
-    note = `Started from the ${template.label} template`;
+  // Let AI draft the agent from a plain description of the business.
+  const description = text(form, "description");
+  if (description.length < 30) {
+    return { error: "Tell us a little more about the business: what it does, when it is open, and why people call." };
   }
+  const drafted = await draftConfig(description);
+  if (!drafted.ok) return { error: drafted.error };
+  return saveNewAgent(accountId, name, drafted.config, "Drafted by AI from your description");
+}
 
+/** Start an agent from a ready-made template, customised with the business's own details. */
+export async function createAgentFromTemplate(_: FormState, form: FormData): Promise<FormState> {
+  const entry = findTemplate(text(form, "template"));
+  const name = text(form, "name");
+  const businessName = text(form, "business_name");
+  if (!entry) return { error: "That template wasn't found. Go back and pick one again." };
+  if (!name) return { error: "Give the agent a name, like “Front desk”." };
+  if (!businessName) return { error: "Enter your business name. The agent says it when it answers." };
+  const timezone = TIME_ZONES.some((z) => z.value === text(form, "timezone")) ? text(form, "timezone") : DEFAULT_TIME_ZONE;
+  const config = applyTemplate(entry.config, { businessName, description: text(form, "description") || entry.description, timezone });
+
+  const checked = await compileConfig(config);
+  if (!checked.ok) {
+    return { error: "errors" in checked ? "Something in those details didn't fit. Shorten the business name or description and try again." : "We couldn't check the agent just now. Try again in a minute." };
+  }
+  return saveNewAgent(text(form, "account_id"), name, config, `Started from the ${entry.label} template`);
+}
+
+async function saveNewAgent(accountId: string, name: string, config: unknown, note: string): Promise<FormState> {
   const supabase = await supabaseServer();
   const { data: agent, error } = await supabase
     .from("agents")
-    .insert({ account_id: accountId, name })
+    .insert({ account_id: accountId, name: name.slice(0, 200) })
     .select("id")
     .single();
   if (error || !agent) return { error: "We couldn't create the agent. Try again." };

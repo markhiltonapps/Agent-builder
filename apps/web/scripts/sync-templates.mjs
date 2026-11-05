@@ -8,6 +8,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const from = join(here, "..", "..", "agent", "templates");
 const to = join(here, "..", "src", "lib", "templates");
 mkdirSync(to, { recursive: true });
-for (const f of readdirSync(from).filter((f) => f.endsWith(".json"))) {
+// Only the ready-made agent library is used by the web app.
+for (const f of readdirSync(from).filter((f) => f === "library.json")) {
   cpSync(join(from, f), join(to, f));
 }

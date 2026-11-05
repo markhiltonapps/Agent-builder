@@ -229,9 +229,12 @@ async def test_take_message_is_recorded_on_the_call_and_drops_empty_fields(cfg):
     message = next(t for t in tools if t.info.name == "take_message")
     out = await message(
         raw_arguments={
-            "name": " Sam Lee ",
+            "first_name": " Sam ",
+            "last_name": "Lee",
             "phone": "5125550100",
+            "email": "sam@example.com",
             "reason": "Leaking faucet",
+            "request_type": "appointment",
             "best_time": " ",
         },
         context=None,
@@ -239,4 +242,34 @@ async def test_take_message_is_recorded_on_the_call_and_drops_empty_fields(cfg):
     assert json.loads(out)["status"] == "recorded"
     (call,) = recorder.calls
     assert (call.tool, call.ok, call.goal) == ("take_message", True, False)
-    assert call.args == {"name": "Sam Lee", "phone": "5125550100", "reason": "Leaking faucet"}
+    assert call.args == {
+        "first_name": "Sam",
+        "last_name": "Lee",
+        "phone": "5125550100",
+        "email": "sam@example.com",
+        "reason": "Leaking faucet",
+        "request_type": "appointment",
+    }
+
+
+def test_take_message_asks_for_the_fields_a_team_needs(cfg):
+    tools, _ = build_tools(cfg, compile_agent(cfg), CallRecorder())
+    schema = next(t for t in tools if t.info.name == "take_message").info.raw_schema["parameters"]
+    assert {"first_name", "last_name", "phone", "reason"} == set(schema["required"])
+    assert {"email", "request_type", "best_time", "details"} <= set(schema["properties"])
+    assert schema["properties"]["request_type"]["enum"] == [
+        "message",
+        "callback",
+        "appointment",
+        "quote",
+        "urgent",
+    ]
+
+
+async def test_a_transfer_does_not_promise_a_connection_it_cannot_make(cfg):
+    recorder = CallRecorder()
+    tools, _ = build_tools(cfg, compile_agent(cfg), recorder)
+    transfer = next(t for t in tools if t.info.name == "transfer_to_human")
+    out = json.loads(await transfer(raw_arguments={"reason": "gas smell"}, context=None))
+    assert out["connected"] is False and "connect you" not in out["say"].lower()
+    assert "take_message" in out["next"] and "Do not say you are connecting" in out["next"]

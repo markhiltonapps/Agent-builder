@@ -46,11 +46,21 @@ def _build(fake: FakeVotel) -> FastMCP:
 
     @mcp.tool()
     def create_contact(
-        phone: str = "", first_name: str = "", last_name: str = "", tags: list[str] | None = None
+        phone: str = "",
+        first_name: str = "",
+        last_name: str = "",
+        email: str = "",
+        tags: list[str] | None = None,
     ) -> str:
         return run(
             "create_contact",
-            {"phone": phone, "first_name": first_name, "last_name": last_name, "tags": tags},
+            {
+                "phone": phone,
+                "first_name": first_name,
+                "last_name": last_name,
+                **({"email": email} if email else {}),
+                "tags": tags,
+            },
             f"Batch create_contact: 1 created\n [0] created | {first_name} | id: {CONTACT_ID}",
         )
 
@@ -274,3 +284,59 @@ def test_the_note_reads_like_a_person_wrote_it():
     text = note_text(_loaded(), _record(goal_reached=True), "id1", "https://app.test/")
     assert "version 3" in text and "1:35 long" in text and "completed its goal" in text
     assert text.rstrip().endswith("https://app.test/calls/id1")
+
+
+async def test_a_full_message_sets_the_name_email_and_task_type(votel):
+    msg = {
+        "tool": "take_message",
+        "ok": True,
+        "args": {
+            "first_name": "Ana",
+            "last_name": "Ruiz",
+            "phone": "5125550142",
+            "email": "ana@example.com",
+            "reason": "Wants a cleaning next week",
+            "request_type": "appointment",
+        },
+    }
+    await sync_call(_cfg(votel), _loaded(), _record(tool_calls=[msg]), "c", source="phone")
+    contact = next(a for n, a in votel.calls if n == "create_contact")
+    task = next(a for n, a in votel.calls if n == "create_task")
+    assert contact["first_name"] == "Ana" and contact["last_name"] == "Ruiz"
+    assert contact["email"] == "ana@example.com"
+    assert task["title"].startswith("Book appointment for Ana Ruiz")
+
+
+async def test_a_badly_typed_email_never_blocks_the_contact(votel):
+    msg = {
+        "tool": "take_message",
+        "ok": True,
+        "args": {
+            "first_name": "Ana",
+            "last_name": "Ruiz",
+            "phone": "5125550142",
+            "email": "ana at example dot com",
+            "reason": "Call me",
+        },
+    }
+    await sync_call(_cfg(votel), _loaded(), _record(tool_calls=[msg]), "c", source="phone")
+    contact = next(a for n, a in votel.calls if n == "create_contact")
+    assert "email" not in contact
+    assert "ana at example dot com" in next(a for n, a in votel.calls if n == "add_note")["note"]
+
+
+async def test_an_urgent_request_is_a_high_priority_task(votel):
+    msg = {
+        "tool": "take_message",
+        "ok": True,
+        "args": {
+            "first_name": "Bo",
+            "last_name": "Kim",
+            "phone": "5125550143",
+            "reason": "Pipe burst",
+            "request_type": "urgent",
+        },
+    }
+    await sync_call(_cfg(votel), _loaded(), _record(tool_calls=[msg]), "c", source="phone")
+    task = next(a for n, a in votel.calls if n == "create_task")
+    assert task["priority"] == "high" and task["title"].startswith("URGENT: call back Bo Kim")

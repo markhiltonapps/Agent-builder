@@ -51,6 +51,27 @@ def _message(record: dict[str, Any]) -> dict[str, str] | None:
     return None
 
 
+def _who(msg: dict[str, str] | None) -> str:
+    """The caller's name from a message: first and last name, or the older single ``name``."""
+    if not msg:
+        return ""
+    full = f"{msg.get('first_name', '')} {msg.get('last_name', '')}".strip()
+    return full or msg.get("name", "").strip()
+
+
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _task_verb(record: dict[str, Any], request_type: str) -> str:
+    if record.get("transferred"):
+        return "Take over"
+    return {
+        "appointment": "Book appointment for",
+        "quote": "Send quote to",
+        "urgent": "URGENT: call back",
+    }.get(request_type, "Call back")
+
+
 def _clock(seconds: float) -> str:
     s = round(seconds)
     return f"{s // 60}:{s % 60:02d}"
@@ -108,13 +129,19 @@ async def sync_call(
 
     persona = loaded.config.persona
     try:
-        name = (msg or {}).get("name", "").strip()
-        first, _, last = name.partition(" ")
+        name = _who(msg)
+        first = (msg or {}).get("first_name", "").strip()
+        last = (msg or {}).get("last_name", "").strip()
+        if not first and not last:
+            first, _, last = name.partition(" ")
         contact: dict[str, Any] = {"phone": phone, "tags": ["voice-agent"]}
         if first:
             contact["first_name"] = first
         if last:
             contact["last_name"] = last
+        email = (msg or {}).get("email", "").strip()
+        if _EMAIL.match(email):
+            contact["email"] = email
         contact_id = first_id(await call_tool(cfg, "create_contact", contact))
         if not contact_id:
             return SyncResult(error="Votel did not return a contact id")
@@ -134,16 +161,17 @@ async def sync_call(
             reason = (
                 (msg or {}).get("reason") or record.get("transfer_reason") or "see the call note"
             )
+            kind = (msg or {}).get("request_type", "")
             await call_tool(
                 cfg,
                 "create_task",
                 {
-                    "title": f"{'Take over' if record.get('transferred') else 'Call back'} {who}: {reason}"[
-                        :200
-                    ],
+                    "title": f"{_task_verb(record, kind)} {who}: {reason}"[:200],
                     "description": body,
                     "lead_id": contact_id,
-                    "priority": "high" if record.get("transferred") else "medium",
+                    "priority": "high"
+                    if record.get("transferred") or kind == "urgent"
+                    else "medium",
                 },
             )
     except VotelError as e:

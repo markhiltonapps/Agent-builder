@@ -110,10 +110,24 @@ def _transfer_tool(cfg: AgentConfig, recorder: CallRecorder) -> RawFunctionTool:
     async def handler(raw_arguments: dict[str, object], context: RunContext) -> str:
         recorder.transferred = True
         recorder.transfer_reason = str(raw_arguments.get("reason", ""))
-        # Step 3 wires this to a SIP transfer. Until then the call log records the intent.
+        # A live hand-off needs the phone line set up (a SIP transfer). Until then this only
+        # records the request, so the agent must not promise a connection it cannot make: it
+        # tells the caller someone will call back and takes their details.
         log.info("transfer requested: %s", recorder.transfer_reason)
         return json.dumps(
-            {"status": "transfer_requested", "say": "Let me connect you with someone now."}
+            {
+                "status": "transfer_requested",
+                "connected": False,
+                "say": (
+                    "I can't put you straight through right now, but I've marked this as "
+                    "urgent and someone will call you back."
+                ),
+                "next": (
+                    "Do not say you are connecting or transferring the caller. Say the line "
+                    "above, then call take_message with request_type 'urgent' so the team has "
+                    "their name and number."
+                ),
+            }
         )
 
     return function_tool(
@@ -151,24 +165,46 @@ def _message_tool(recorder: CallRecorder) -> RawFunctionTool:
         raw_schema={
             "name": "take_message",
             "description": (
-                "Record a message for the team when you cannot do something yourself. Read the "
-                "phone number back to the caller before you call this."
+                "Record a message or request for the team: a callback, an appointment request, "
+                "a quote request or an urgent matter. Use it when you cannot finish something "
+                "yourself. Read the phone number back to the caller before you call this."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "Caller's name."},
+                    "first_name": {"type": "string", "description": "Caller's first name."},
+                    "last_name": {"type": "string", "description": "Caller's last name."},
                     "phone": {"type": "string", "description": "Callback number."},
+                    "email": {
+                        "type": "string",
+                        "description": "Email address, if the caller gave one.",
+                    },
                     "reason": {
                         "type": "string",
-                        "description": "What they need, in one or two sentences.",
+                        "description": "Why they are calling, in one or two sentences.",
+                    },
+                    "request_type": {
+                        "type": "string",
+                        "enum": ["message", "callback", "appointment", "quote", "urgent"],
+                        "description": (
+                            "What the caller wants: 'appointment' to book a visit, 'quote' for "
+                            "a price, 'urgent' when it cannot wait, 'callback' to be called "
+                            "back, otherwise 'message'."
+                        ),
                     },
                     "best_time": {
                         "type": "string",
-                        "description": "When to call back, if they said.",
+                        "description": "Preferred day and time to be called or seen, if said.",
+                    },
+                    "details": {
+                        "type": "string",
+                        "description": (
+                            "Anything else the team needs, such as the vehicle, the property or "
+                            "the service asked about."
+                        ),
                     },
                 },
-                "required": ["name", "phone", "reason"],
+                "required": ["first_name", "last_name", "phone", "reason"],
                 "additionalProperties": False,
             },
         },

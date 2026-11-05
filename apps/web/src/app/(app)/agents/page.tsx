@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LocalTime } from "@/components/local-time";
 import { supabaseServer } from "@/lib/supabase/server";
-import { TEMPLATES } from "@/lib/templates";
-import { CreateAccountForm, CreateAgentForm, SyncVotelButton } from "./forms";
+import { CreateAccountForm, SyncVotelButton } from "./forms";
 
 export const metadata: Metadata = { title: "Agents" };
 
@@ -62,14 +61,20 @@ export default async function AgentsPage() {
           </ul>
         ) : (
           <p className="glass p-6 text-muted">
-            No agents yet. Use New agent to name your agent and choose how to start. You&apos;ll have a working agent to edit and test in a minute.
+            No agents yet. Choose a ready-made agent for your kind of business and you&apos;ll have something to edit and test in a minute.
           </p>
         )}
       </section>
 
       <aside className="glass h-fit p-5 lg:sticky lg:top-20" aria-labelledby="new-h">
-        <h2 id="new-h" className="mb-4 font-medium">New agent</h2>
-        <CreateAgentForm accountId={account.id} templates={TEMPLATES.map(({ key, label, blurb }) => ({ key, label, blurb }))} />
+        <h2 id="new-h" className="mb-2 font-medium">New agent</h2>
+        <p className="mb-4 text-sm text-muted">
+          Start from a ready-made agent for your kind of business, with the right questions and safety rules already in.
+        </p>
+        <div className="space-y-2">
+          <Link href="/agents/new" className="btn btn-primary w-full">Choose a ready-made agent</Link>
+          <Link href="/agents/new?tab=ai" className="btn w-full">Describe it and let AI draft it</Link>
+        </div>
       </aside>
     </div>
   );

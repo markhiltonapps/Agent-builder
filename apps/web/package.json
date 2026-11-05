@@ -11,7 +11,8 @@
     "predev": "npm run sync-templates",
     "prebuild": "npm run sync-templates",
     "test": "node --test src/lib/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pretest": "npm run sync-templates"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
