@@ -31,7 +31,8 @@ MAX_ANSWER_CHARS = 700
 STYLE = (
     "You answer a question for a receptionist who will read your answer aloud to a caller. Search the web and "
     "answer in two or three short, plain sentences: names, distances, opening hours and prices where you found "
-    "them. No markdown, no lists, no links, no filler. If you cannot find a reliable answer, say so in one sentence."
+    "them. No markdown, no lists, no links, no filler, and never ask a question back. If you cannot find a reliable "
+    "answer, say so in one sentence."
 )
 
 
@@ -54,7 +55,12 @@ def _clean(text: str) -> str:
 
 
 def _prompt(query: str, location: str) -> str:
-    where = f"\nThe caller is asking about the area of: {location}." if location.strip() else ""
+    where = (
+        f"\nThe caller is staying at a hotel in {location}. Questions about what is nearby mean {location} in general: "
+        "do not ask for the hotel's address or say you cannot place it. Name each place with its neighborhood."
+        if location.strip()
+        else ""
+    )
     return f"Question: {query.strip()[:MAX_QUERY_CHARS]}{where}"
 
 

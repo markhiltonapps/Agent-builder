@@ -89,7 +89,10 @@ SERVICES: dict[str, dict[str, Any]] = {
         "fee": 0,
         "status": "confirmed",
         "needs": "the time they would like to leave",
-        "note": "Late check-out until 1 pm is complimentary. Until 3 pm, add $30 at the front desk if the room is not needed.",
+        "free_until": 13,
+        "fee_until": 15,
+        "fee_amount": 30,
+        "note": "Late check-out until 1 pm is complimentary. Until 3 pm costs $30, if the room is not needed. 3 pm is the latest.",
     },
     "airport_shuttle": {
         "fee": 25,

@@ -158,7 +158,9 @@ def compile_agent(cfg: AgentConfig, now: datetime | None = None) -> CompiledAgen
     web_rules = ""
     if web:
         near = (
-            f" The business is in {web.location.strip()}; search for things near it."
+            f" The business is in {web.location.strip()}; search for things in or around {web.location.strip()}, such as "
+            f"'golf courses in {web.location.strip()}'. Never put 'near the hotel' or 'near us' in a search, and never ask "
+            "the caller for the business's address in order to search."
             if web.location.strip()
             else ""
         )

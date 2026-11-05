@@ -61,6 +61,24 @@ def _parse_date(raw: Any, field: str) -> date:
         raise ToolFailed(f"{field} must be a date written YYYY-MM-DD") from None
 
 
+def _hour(text: str) -> float | None:
+    """The clock time in a phrase such as "2 pm", "2:30" or "14:00", as hours since midnight (None if there is none).
+    A bare 1 to 6 means the afternoon."""
+    m = re.search(r"\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?", text.lower())
+    if not m:
+        return None
+    hour, minute, mer = int(m.group(1)), int(m.group(2) or 0), (m.group(3) or "").replace(".", "")
+    if hour > 24 or minute > 59:
+        return None
+    if mer == "pm" and hour < 12:
+        hour += 12
+    elif mer == "am" and hour == 12:
+        hour = 0
+    elif not mer and 1 <= hour <= 6:
+        hour += 12
+    return hour + minute / 60
+
+
 def _digits(raw: Any) -> str:
     return re.sub(r"\D", "", str(raw or ""))
 
@@ -700,6 +718,25 @@ class HotelDemoAdapter:
             fee *= int(r["nights"])
         if spec.get("needs") and not detail:
             raise ToolFailed(f"ask the guest for: {spec['needs']}")
+        if service == "late_check_out":
+            hour = _hour(detail)
+            if hour is None:
+                raise ToolFailed(
+                    "ask for the time they would like to leave, such as 1 pm or 2:30 pm"
+                )
+            if hour > float(spec.get("fee_until", 15)):
+                return {
+                    "requested": False,
+                    "service": service,
+                    "status": "not available",
+                    "fee": "no charge",
+                    "note": "The latest late check-out is 3 pm. Offer 3 pm or earlier.",
+                }
+            fee = (
+                Decimal(str(spec.get("fee_amount", 30)))
+                if hour > float(spec.get("free_until", 13))
+                else Decimal(0)
+            )
         entry = {
             "service": service,
             "details": detail,

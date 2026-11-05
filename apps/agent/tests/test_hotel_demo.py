@@ -415,3 +415,43 @@ async def test_a_call_that_restarts_keeps_its_payment_and_booking():
     again.restore(snap)
     assert again.state["charges"][0]["auth_code"] == paid["authorization_code"]
     assert "4242424242424242" not in str(snap)
+
+
+@pytest.mark.parametrize(
+    "said,fee,status",
+    [
+        ("1 pm", "no charge", "confirmed"),
+        ("12:30", "no charge", "confirmed"),
+        ("2 pm", "$30.00", "confirmed"),
+        ("around 2:30", "$30.00", "confirmed"),
+        ("3 pm", "$30.00", "confirmed"),
+        ("4 pm", "no charge", "not available"),
+        ("16:00", "no charge", "not available"),
+    ],
+)
+async def test_a_late_check_out_is_free_to_1_pm_costs_30_to_3_pm_and_is_refused_after(
+    said, fee, status
+):
+    out = await hotel().call(
+        "request_service",
+        {
+            "confirmation_number": "HH-48213",
+            "last_name": "Johnson",
+            "service": "late_check_out",
+            "details": said,
+        },
+    )
+    assert out["status"] == status and out["fee"] == fee
+
+
+async def test_a_late_check_out_with_no_time_asks_for_one():
+    with pytest.raises(ToolFailed, match="time"):
+        await hotel().call(
+            "request_service",
+            {
+                "confirmation_number": "HH-48213",
+                "last_name": "Johnson",
+                "service": "late_check_out",
+                "details": "as late as possible",
+            },
+        )
