@@ -165,7 +165,7 @@ export default function HelpPage() {
         <P>
           The preview is a mock website running the real button, so what you see is what visitors get. Switch it between a
           computer and a phone screen, and between a light and a dark page. To test the real thing without leaving the page,
-          choose <B>Try a real call</B> above the preview. The live call box appears right there: allow your microphone and talk
+          choose <B>Try a real call</B> above the preview (or click the button in the preview, then <B>Try a real call</B>). The live call box appears right there, even if you limited the agent to your own website: allow your microphone and talk
           to your agent. A test call is a real call, so it costs the usual few cents a minute and counts toward your daily limit.
         </P>
         <P>

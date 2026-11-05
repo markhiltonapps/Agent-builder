@@ -39,7 +39,8 @@ export function parseSites(text: string): { sites: string[]; bad: string[] } {
 export function frameAncestors(origins: string[]): string {
   if (origins.length === 0) return "frame-ancestors *";
   const ok = origins.filter((o) => SITE.test(o));
-  return `frame-ancestors ${ok.length ? ok.join(" ") : "'none'"}`;
+  // 'self' lets this app show the call box itself (the Try a real call test on the Put on website page).
+  return `frame-ancestors 'self'${ok.length ? ` ${ok.join(" ")}` : ""}`;
 }
 
 /**

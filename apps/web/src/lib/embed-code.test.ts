@@ -25,8 +25,8 @@ test("a list is split, cleaned and de-duplicated, and bad lines are reported", (
 
 test("only valid sites can reach the frame header; a blank list means any site", () => {
   assert.equal(frameAncestors([]), "frame-ancestors *");
-  assert.equal(frameAncestors(["https://example.com", "https://*.example.org"]), "frame-ancestors https://example.com https://*.example.org");
-  assert.equal(frameAncestors(["https://example.com; script-src *", "bad"]), "frame-ancestors 'none'");
+  assert.equal(frameAncestors(["https://example.com", "https://*.example.org"]), "frame-ancestors 'self' https://example.com https://*.example.org");
+  assert.equal(frameAncestors(["https://example.com; script-src *", "bad"]), "frame-ancestors 'self'");
 });
 
 test("only our own pages may start a call", () => {

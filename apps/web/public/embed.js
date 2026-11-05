@@ -182,8 +182,15 @@
     if (!panel.firstChild) {
       if (preview) {
         var note = document.createElement("div");
-        note.style.cssText = "display:grid;place-items:center;height:100%;padding:24px;text-align:center;color:#c4cadc;font:500 14px/1.5 system-ui,sans-serif";
+        note.style.cssText = "display:grid;place-content:center;justify-items:center;gap:14px;height:100%;padding:24px;text-align:center;color:#c4cadc;font:500 14px/1.5 system-ui,sans-serif";
         note.textContent = "Your call box opens here. In this preview, calls are switched off.";
+        // The designer page listens for this, so you can test the real agent without leaving it.
+        var tryBtn = document.createElement("button");
+        tryBtn.type = "button";
+        tryBtn.textContent = "Try a real call";
+        tryBtn.style.cssText = "all:unset;box-sizing:border-box;cursor:pointer;padding:10px 18px;border-radius:999px;background:" + color + ";color:" + ink + ";font:600 14px system-ui,sans-serif;border:1px solid rgba(255,255,255,.3)";
+        tryBtn.addEventListener("click", function () { try { window.parent.postMessage({ neato: "try-live" }, "*"); } catch (e) { /* not in a frame */ } });
+        note.appendChild(tryBtn);
         panel.appendChild(note);
       } else {
         var frame = document.createElement("iframe");

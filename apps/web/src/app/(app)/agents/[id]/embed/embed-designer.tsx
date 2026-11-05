@@ -169,6 +169,15 @@ export function EmbedDesigner({ appUrl, agentId }: { appUrl: string; agentId: st
   const upBox = (k: keyof BoxStyle, v: number) => save({ style: typed, box: normalizeBox({ ...box, [k]: v }) });
 
   const doc = useMemo(() => previewDocument({ appUrl, agentId, mode, style, box, backdrop }), [appUrl, agentId, mode, style, box, backdrop]);
+  const previewRef = useRef<HTMLIFrameElement>(null);
+  // The preview's "Try a real call" button asks this page to show the live call box.
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.source === previewRef.current?.contentWindow && (e.data as { neato?: string } | null)?.neato === "try-live") setView("live");
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
   const [shownDoc, setShownDoc] = useState(doc);
   useEffect(() => { const t = setTimeout(() => setShownDoc(doc), 120); return () => clearTimeout(t); }, [doc]);
 
@@ -270,13 +279,14 @@ export function EmbedDesigner({ appUrl, agentId }: { appUrl: string; agentId: st
             <>
               <div className="rounded-2xl border border-line bg-black/30 p-2">
                 <iframe
+                  ref={previewRef}
                   title="Preview of your website with the button on it"
                   sandbox="allow-scripts"
                   srcDoc={shownDoc}
                   className={`mx-auto block h-[24rem] rounded-xl border-0 bg-white ${device === "mobile" ? "w-[375px] max-w-full" : "w-full"}`}
                 />
               </div>
-              <p className="text-xs text-faint">This is how it will look on a typical page. Click the button to see where the call box opens. In this preview, no call is started.</p>
+              <p className="text-xs text-faint">This is how it will look on a typical page. Click the button to see where the call box opens, then choose Try a real call to talk to your agent here. The preview itself never starts a call.</p>
             </>
           ) : (
             <>
