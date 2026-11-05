@@ -232,13 +232,14 @@ export function prepareText(title: string, filename: string, text: string): Prep
   return { ok: true, title: t, filename: filename.slice(0, 200), content, chunks };
 }
 
-/** "All agents", "No agents", the agent's name, or how many. */
-export function scopeLabel(agentIds: string[] | null, agents: Array<{ id: string; name: string }>): string {
-  if (agentIds === null) return "All agents";
+/** Who uses a document, in a few words: always the client's own agents, never anyone else's. */
+export function scopeLabel(agentIds: string[] | null, agents: Array<{ id: string; name: string }>, clientName = "this client"): string {
+  const all = `All ${clientName} agents`;
+  if (agentIds === null) return agents.length ? all : "No agents yet";
   const known = agents.filter((a) => agentIds.includes(a.id));
   if (known.length === 0) return "No agents";
-  if (known.length === agents.length && agents.length > 1) return "All agents";
-  return known.length === 1 ? known[0].name : `${known.length} agents`;
+  if (known.length === agents.length && agents.length > 1) return all;
+  return known.length === 1 ? known[0].name : `${known.length} of ${agents.length} agents`;
 }
 
 /** "3 KB" for a document's size. */

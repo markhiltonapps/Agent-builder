@@ -32,6 +32,12 @@ export default async function KnowledgePage() {
           Upload Markdown or text files and the agents answer from them, on calls and in chat. Changes apply to the next call or chat,
           with nothing to publish.
         </p>
+        <p role="note" className="mt-3 max-w-2xl rounded-2xl border border-accent/30 bg-accent/10 p-3 text-sm leading-relaxed text-text">
+          You are adding knowledge for <strong className="font-medium">{current.name}</strong>. Only {current.name}&apos;s agents
+          ({(agents ?? []).length ? (agents ?? []).map((a) => a.name).join(", ") : "none yet"}) can use it, and no other client&apos;s
+          agent ever sees it. To add knowledge for a different client, choose that client in the <strong className="font-medium">Client</strong> menu at
+          the top. To keep a document to one of {current.name}&apos;s agents, open it and choose <strong className="font-medium">Only the ones I choose</strong>.
+        </p>
       </div>
 
       {canEdit ? (
@@ -58,7 +64,7 @@ export default async function KnowledgePage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="chip whitespace-nowrap">{scopeLabel(d.agent_ids as string[] | null, agents ?? [])}</span>
+                  <span className="chip whitespace-nowrap">{scopeLabel(d.agent_ids as string[] | null, agents ?? [], current.name)}</span>
                   {canEdit && <Link href={`/knowledge/${d.id}`} className="btn">Edit<span className="sr-only"> {d.title}</span></Link>}
                   {canEdit && <DeleteButton docId={d.id as string} title={d.title as string} />}
                 </div>

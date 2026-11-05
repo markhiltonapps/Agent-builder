@@ -136,9 +136,9 @@ export function DeleteButton({ docId, title, redirectTo }: { docId: string; titl
 
 /** Change a document's title and text, and choose which agents use it. */
 export function Editor({
-  accountId, docId, initialTitle, initialText, agents, initialAgentIds,
+  accountId, clientName, docId, initialTitle, initialText, agents, initialAgentIds,
 }: {
-  accountId: string; docId: string; initialTitle: string; initialText: string;
+  accountId: string; clientName: string; docId: string; initialTitle: string; initialText: string;
   agents: Array<{ id: string; name: string }>; initialAgentIds: string[] | null;
 }) {
   const router = useRouter();
@@ -182,10 +182,10 @@ export function Editor({
         <textarea id={`${id}-b`} className="field min-h-[24rem] font-mono text-sm" value={text} onChange={(e) => setText(e.target.value)} spellCheck />
       </div>
       <fieldset className="space-y-2">
-        <legend className="label">Which agents use this?</legend>
+        <legend className="label">Which of {clientName}&apos;s agents use this?</legend>
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <input type="radio" name={`${id}-scope`} className="size-4" checked={all} onChange={() => setAll(true)} />
-          Every agent for this client
+          All of {clientName}&apos;s agents{agents.length ? ` (${agents.map((a) => a.name).join(", ")})` : ""}
         </label>
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <input type="radio" name={`${id}-scope`} className="size-4" checked={!all} onChange={() => setAll(false)} />

@@ -91,12 +91,15 @@ test("typed text needs a title and some text", () => {
 
 test("who a document is for, in a few words", () => {
   const agents = [{ id: "a", name: "Front Desk" }, { id: "b", name: "Billing" }];
-  assert.equal(scopeLabel(null, agents), "All agents");
+  assert.equal(scopeLabel(null, agents, "Right Weight Scale"), "All Right Weight Scale agents");
+  assert.equal(scopeLabel(null, agents), "All this client agents");
+  assert.equal(scopeLabel(null, []), "No agents yet");
   assert.equal(scopeLabel([], agents), "No agents");
   assert.equal(scopeLabel(["a"], agents), "Front Desk");
-  assert.equal(scopeLabel(["a", "b"], agents), "All agents");
+  assert.equal(scopeLabel(["a", "b"], agents, "Acme"), "All Acme agents");
   assert.equal(scopeLabel(["a", "gone"], agents), "Front Desk");
   assert.equal(scopeLabel(["a"], [{ id: "a", name: "Only" }]), "Only");
+  assert.equal(scopeLabel(["a", "b"], [...agents, { id: "c", name: "Third" }]), "2 of 3 agents");
   assert.equal(sizeLabel(450), "450 characters");
   assert.equal(sizeLabel(3200), "3.2 KB");
   assert.equal(sizeLabel(45_000), "45 KB");

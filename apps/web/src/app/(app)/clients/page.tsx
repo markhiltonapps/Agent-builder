@@ -78,7 +78,7 @@ export default async function ClientsPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {([["/agents", "All agents", true], ["/agents/new", "New agent", false], ["/calls", "Calls", false], ["/dashboard", "Dashboard", false]] as const).map(([to, label, primary]) => (
+                {([["/agents", "All agents", true], ["/agents/new", "New agent", false], ["/knowledge", "Knowledge", false], ["/calls", "Calls", false], ["/dashboard", "Dashboard", false]] as const).map(([to, label, primary]) => (
                   <form key={to} action={openClient}>
                     <input type="hidden" name="account_id" value={c.id} />
                     <input type="hidden" name="to" value={to} />

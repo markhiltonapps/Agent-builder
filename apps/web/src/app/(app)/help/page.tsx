@@ -172,15 +172,16 @@ export default function HelpPage() {
         <H id="knowledge">Give your agent knowledge</H>
         <P>
           Open <B>Knowledge</B> in the top bar. This is where you put the facts your agents answer from: prices, opening hours,
-          services, policies and the answers to questions callers ask again and again. Each client has its own knowledge, so
-          what you add for one client is never heard by another.
+          services, policies and the answers to questions callers ask again and again. Knowledge belongs to the client you are working in (the
+          <B>Client</B> menu at the top). Only that client&apos;s agents use it, and what you add for one client is never heard by another.
+          To add knowledge for a different client, choose that client in the menu first, or press <B>Knowledge</B> on its card under <B>Clients</B>.
         </P>
         <Shot name="knowledge" height={800} alt="The Knowledge page: a box to choose or drop files, a place to write a document, and a list of documents with who uses each"
           caption="1: choose or drop files. 2: or write a document here. 3: a document; click it to read or change it. 4: which agents use it." />
         <Steps>
           <li>Choose <B>Choose files</B>, or drop files onto the box. Markdown (<B>.md</B>) and plain text (<B>.txt</B>) both work, up to 2 MB each, and you can add several at once. A long file, such as a whole website saved as one Markdown file, is split into parts for you at its headings (&ldquo;Example site (part 2 of 6)&rdquo;). Or open <B>Or write a document here</B> and type or paste it.</li>
           <li>Each document appears in the list, with its size and which agents use it. Click one to read or change its text.</li>
-          <li>On a document&apos;s page, choose <B>Every agent for this client</B> or <B>Only the ones I choose</B>, then <B>Save changes</B>.</li>
+          <li>On a document&apos;s page, choose <B>All of the client&apos;s agents</B> or <B>Only the ones I choose</B>, then <B>Save changes</B>.</li>
         </Steps>
         <P>
           There is nothing to publish. The next call or chat uses what is in the list, and deleting a document stops it being used

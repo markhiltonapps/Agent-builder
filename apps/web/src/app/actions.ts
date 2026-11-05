@@ -371,7 +371,7 @@ export async function switchClient(accountId: string): Promise<void> {
   revalidatePath("/", "layout");
 }
 
-const OPEN_TARGETS = /^\/(agents|agents\/new|agents\/[0-9a-f-]{36}(\/(talk|embed|versions))?|calls|dashboard|usage|numbers)$/;
+const OPEN_TARGETS = /^\/(agents|agents\/new|agents\/[0-9a-f-]{36}(\/(talk|embed|versions))?|calls|dashboard|usage|numbers|knowledge)$/;
 
 /** Work in this client, then go to a page of its own: its agents (the default), one agent, its calls... */
 export async function openClient(form: FormData): Promise<void> {

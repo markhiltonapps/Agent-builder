@@ -20,6 +20,10 @@ export default async function AgentsPage() {
         .order("updated_at", { ascending: false })
     : { data: null };
 
+  const { count: knowledgeCount } = current
+    ? await supabase.from("knowledge_docs").select("id", { count: "exact", head: true }).eq("account_id", current.id)
+    : { count: 0 };
+
   if (!current) {
     return (
       <section className="glass mx-auto mt-10 max-w-lg p-6">
@@ -37,7 +41,12 @@ export default async function AgentsPage() {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <section aria-labelledby="agents-h">
         <h1 id="agents-h" className="text-2xl font-semibold tracking-tight">Agents</h1>
-        <p className="mt-1 text-sm text-muted">{account.name}</p>
+        <p className="mt-1 text-sm text-muted">
+          {account.name} ·{" "}
+          <Link href="/knowledge" className="link">
+            Knowledge: {knowledgeCount ? `${knowledgeCount} document${knowledgeCount === 1 ? "" : "s"}` : "none yet"}
+          </Link>
+        </p>
         <div className="mb-4 mt-3 space-y-2"><SyncVotelButton /><Suspense fallback={<p className="text-xs text-faint">Checking the voice service…</p>}><VoiceStatusLine /></Suspense></div>
         {agents?.length ? (
           <ul className="grid gap-3 sm:grid-cols-2">
