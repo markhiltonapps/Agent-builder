@@ -49,6 +49,9 @@ log = logging.getLogger("agent_builder")
 CALL_LOG_DIR = Path(os.getenv("CALL_LOG_DIR", ROOT / "call_logs"))
 CONVERSATION_DIR = ROOT / "conversations"
 
+GREETING_RETRY_S = 8.0
+"""How long the backup voice gets to say its greeting before it is asked again."""
+
 MAX_RESTARTS = 2
 """Fresh sessions per call after a model error, before the worker gives up."""
 RESTART_BACKOFF_S = (0.5, 2.0)
@@ -88,16 +91,44 @@ class BuilderAgent(Agent):
         super().__init__(instructions=instructions, tools=tools, chat_ctx=chat_ctx)
         self._compiled = compiled
         self._resume_note = resume_note
+        self._single_model = single_model
+        self._heard = False
+        self._watchdog: asyncio.Task[None] | None = None
+
+    def _greet(self) -> None:
+        self.session.generate_reply(
+            instructions=f'Greet the caller now by saying exactly: "{self._compiled.opening_line}"'
+        )
 
     async def on_enter(self) -> None:
         if self._resume_note is not None:
             self.session.generate_reply(instructions=self._resume_note)
-        else:
-            self.session.generate_reply(
-                instructions=(
-                    f'Greet the caller now by saying exactly: "{self._compiled.opening_line}"'
-                )
-            )
+            return
+        self._greet()
+        if self._single_model:
+            # Gemini can take longer to start talking than the library waits for, and a greeting
+            # that arrives late is thrown away. If nothing has been said yet, ask again.
+            def heard(ev: object | None = None) -> None:
+                state = getattr(ev, "new_state", "speaking")  # a transcript line has no state
+                if state == "speaking":
+                    self._heard = True
+
+            self.session.on("conversation_item_added", heard)
+            self.session.on("agent_state_changed", heard)
+            self.session.on("user_state_changed", heard)
+            self._watchdog = asyncio.create_task(self._greeting_watchdog())
+
+    async def _greeting_watchdog(self) -> None:
+        for attempt in (1, 2):
+            await asyncio.sleep(GREETING_RETRY_S)
+            if self._heard:
+                return
+            log.warning("no greeting yet from the backup voice; asking again (%d)", attempt)
+            try:
+                self._greet()
+            except Exception:
+                log.exception("could not ask for the greeting again")
+                return
 
 
 def conversation_of(agent: Agent) -> ChatContext:

@@ -142,3 +142,68 @@ def test_the_gemini_model_is_built_only_with_a_key(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "g-test-key")
     model = build_voice_model(GEMINI, compiled)
     assert model.model == "gemini-3.1-flash-live-preview"
+
+
+class FakeSession:
+    def __init__(self):
+        self.replies: list[str] = []
+        self.handlers: dict[str, list] = {}
+
+    def generate_reply(self, *, instructions: str):
+        self.replies.append(instructions)
+
+    def on(self, event: str, cb):
+        self.handlers.setdefault(event, []).append(cb)
+
+    def fire(self, event: str, state: str | None = None):
+        from types import SimpleNamespace
+
+        ev = SimpleNamespace(new_state=state) if state else SimpleNamespace()
+        for cb in self.handlers.get(event, []):
+            cb(ev)
+
+
+@pytest.fixture
+def greeting(monkeypatch):
+    from agent_builder import worker
+
+    monkeypatch.setattr(worker, "GREETING_RETRY_S", 0.05)
+    fake = FakeSession()
+    monkeypatch.setattr(worker.BuilderAgent, "session", property(lambda self: fake))
+    compiled = compile_agent(load_file(DEFAULT_CONFIG))
+    return worker, fake, compiled
+
+
+async def test_a_backup_voice_that_stays_silent_is_asked_for_its_greeting_again(greeting):
+    import asyncio
+
+    worker, fake, compiled = greeting
+    agent = worker.BuilderAgent(compiled, [], single_model=True)
+    await agent.on_enter()
+    await asyncio.sleep(0.3)
+    assert len(fake.replies) == 3  # the first ask and two retries, then it stops
+    assert all(compiled.opening_line in r for r in fake.replies)
+
+
+async def test_once_the_agent_has_spoken_the_greeting_is_not_repeated(greeting):
+    import asyncio
+
+    worker, fake, compiled = greeting
+    agent = worker.BuilderAgent(compiled, [], single_model=True)
+    await agent.on_enter()
+    fake.fire("agent_state_changed", "listening")  # just getting ready: not a greeting
+    await asyncio.sleep(0.07)
+    assert len(fake.replies) == 2  # so it still asked again
+    fake.fire("agent_state_changed", "speaking")
+    await asyncio.sleep(0.25)
+    assert len(fake.replies) == 2  # and stopped asking once it spoke
+
+
+async def test_the_main_voice_greets_once_with_no_watchdog(greeting):
+    import asyncio
+
+    worker, fake, compiled = greeting
+    agent = worker.BuilderAgent(compiled, [])
+    await agent.on_enter()
+    await asyncio.sleep(0.25)
+    assert len(fake.replies) == 1 and fake.handlers == {}
