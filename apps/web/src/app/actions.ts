@@ -8,6 +8,7 @@ import { compileConfig, draftConfig, reviseConfig } from "@/lib/builder-api";
 import { pushCard } from "@/lib/directory";
 import { MAX_SITES, parseSites } from "@/lib/embed-code";
 import { forgetEmbedInfo } from "@/lib/embed-info";
+import { logoKind, logoProblem } from "@/lib/embed-logo";
 import { importVotelAgent, listVotelBookables, type VotelBookable } from "@/lib/votel-import";
 import { callToken } from "@/lib/livekit";
 import type { Compiled, ValidationIssue } from "@/lib/config";
@@ -318,6 +319,25 @@ export async function saveEmbed(agentId: string, enabled: boolean, sitesText: st
   forgetEmbedInfo(agentId);
   revalidatePath(`/agents/${agentId}/embed`);
   return { ok: true, sites };
+}
+
+export type LogoResult = { ok: true; url: string } | { ok: false; error: string };
+
+/** Store a logo for the website button and give back its public address. */
+export async function uploadEmbedLogo(agentId: string, form: FormData): Promise<LogoResult> {
+  const file = form.get("logo");
+  if (!(file instanceof File)) return { ok: false, error: "Choose a picture first." };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const problem = logoProblem(bytes);
+  const kind = logoKind(bytes);
+  if (problem || !kind) return { ok: false, error: problem ?? "Use a PNG, JPG or WebP picture." };
+  if (!/^[0-9a-f-]{36}$/i.test(agentId)) return { ok: false, error: "We couldn't find that agent." };
+
+  const supabase = await supabaseServer();
+  const path = `${agentId}/${crypto.randomUUID()}.${kind.ext}`;
+  const { error } = await supabase.storage.from("embed-logos").upload(path, bytes, { contentType: kind.type, cacheControl: "31536000" });
+  if (error) return { ok: false, error: "We couldn't save that picture. You may not have edit access to this agent." };
+  return { ok: true, url: supabase.storage.from("embed-logos").getPublicUrl(path).data.publicUrl };
 }
 
 // --- clients (workspaces) ----------------------------------------------------------------

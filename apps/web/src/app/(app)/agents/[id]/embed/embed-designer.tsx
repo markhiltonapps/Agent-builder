@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import {
   DEFAULT_BOX, DEFAULT_STYLE, EDGES, ICONS, LOOKS, POSITIONS, SHAPES, SIZES, SWATCHES,
   type BoxStyle, type ButtonStyle, type Backdrop, type Device,
-  iframeSnippet, normalizeBox, normalizeStyle, previewDocument, scriptSnippet,
+  LOGO_PATTERN, iframeSnippet, normalizeBox, normalizeStyle, parseHex, previewDocument, scriptSnippet,
 } from "@/lib/embed-style";
+import { uploadEmbedLogo } from "@/app/actions";
 
 const WORDS: Record<string, string> = {
   "bottom-right": "Bottom right", "bottom-left": "Bottom left", "bottom-center": "Bottom middle",
   "top-right": "Top right", "top-left": "Top left", "top-center": "Top middle",
-  pill: "Pill", rounded: "Rounded", square: "Square", circle: "Round",
+  pill: "Pill", rounded: "Rounded", square: "Square", circle: "Round", orb: "Glowing orb",
   small: "Small", medium: "Medium", large: "Large",
   solid: "Solid", glass: "Glass", outline: "Outline",
   none: "No icon", mic: "Microphone", phone: "Phone", chat: "Chat",
@@ -34,6 +35,76 @@ function Choice<T extends string>({ legend, value, options, onChange }: { legend
           </label>
         ))}
       </div>
+    </fieldset>
+  );
+}
+
+/** The colour as a typed hex code. Half-typed codes wait; a complete one is applied at once. */
+function HexField({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
+  const id = useId();
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? value;
+  const bad = draft !== null && draft.trim() !== "" && parseHex(draft) === null;
+  return (
+    <div>
+      <label className="label" htmlFor={id}>Or type a hex code</label>
+      <input id={id} className="field w-36 font-mono" value={shown} maxLength={7} spellCheck={false} autoComplete="off"
+        aria-invalid={bad} aria-describedby={bad ? `${id}-hint` : undefined}
+        onChange={(e) => { setDraft(e.target.value); const hex = parseHex(e.target.value); if (hex) onChange(hex); }}
+        onBlur={() => setDraft(null)} />
+      {bad && <p id={`${id}-hint`} className="mt-1 text-xs text-danger">A hex code looks like #0f766e (six letters or numbers, 0 to 9 and a to f).</p>}
+    </div>
+  );
+}
+
+/** Upload a logo (or paste the address of one), see it, and take it away again. */
+function LogoField({ agentId, value, onChange }: { agentId: string; value: string; onChange: (url: string) => void }) {
+  const id = useId();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, startUpload] = useTransition();
+  const [problem, setProblem] = useState("");
+  const [typed, setTyped] = useState<string | null>(null);
+  const pasted = typed ?? value;
+  const badAddress = typed !== null && typed.trim() !== "" && !LOGO_PATTERN.test(typed.trim());
+
+  function pick(file: File | undefined) {
+    if (!file) return;
+    setProblem("");
+    if (file.size > 512 * 1024) { setProblem("That picture is too big. Use one under 512 KB."); return; }
+    const form = new FormData();
+    form.set("logo", file);
+    startUpload(async () => {
+      const r = await uploadEmbedLogo(agentId, form);
+      if (r.ok) { setTyped(null); onChange(r.url); } else setProblem(r.error);
+      if (fileRef.current) fileRef.current.value = "";
+    });
+  }
+
+  return (
+    <fieldset className="space-y-2">
+      <legend className="label">Logo (optional)</legend>
+      <div className="flex flex-wrap items-center gap-3">
+        {value ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={value} alt="Your logo" className="size-12 rounded-full border border-line bg-white object-cover" />
+        ) : (
+          <span aria-hidden className="grid size-12 place-items-center rounded-full border border-dashed border-line text-xs text-faint">none</span>
+        )}
+        <input ref={fileRef} id={id} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
+        <label htmlFor={id} className={`btn cursor-pointer ${busy ? "pointer-events-none opacity-60" : ""}`}>{busy ? "Uploading…" : value ? "Choose another" : "Upload a logo"}</label>
+        {value && <button type="button" className="btn btn-quiet" onClick={() => { setTyped(null); onChange(""); }}>Remove</button>}
+      </div>
+      <p className="text-xs text-faint">PNG, JPG or WebP, under 512 KB. A square picture works best. It shows as a round badge on the button, or inside the orb.</p>
+      <div role="status" aria-live="polite" className="text-sm text-danger">{problem}</div>
+      <details>
+        <summary className="cursor-pointer text-sm text-muted">Or use a picture that is already online</summary>
+        <label className="label mt-2" htmlFor={`${id}-url`}>Picture address</label>
+        <input id={`${id}-url`} className="field" placeholder="https://example.com/logo.png" value={pasted} spellCheck={false}
+          aria-invalid={badAddress}
+          onChange={(e) => { setTyped(e.target.value); const v = e.target.value.trim(); if (v === "" || LOGO_PATTERN.test(v)) onChange(v); }}
+          onBlur={() => setTyped(null)} />
+        {badAddress && <p className="mt-1 text-xs text-danger">The address has to start with https:// and have no spaces.</p>}
+      </details>
     </fieldset>
   );
 }
@@ -118,7 +189,7 @@ export function EmbedDesigner({ appUrl, agentId }: { appUrl: string; agentId: st
           {mode === "button" ? (
             <>
               <div>
-                <label className="label" htmlFor={labelId}>Words on the button</label>
+                <label className="label" htmlFor={labelId}>{style.shape === "orb" ? "Words beside the orb" : "Words on the button"}</label>
                 <input id={labelId} className="field" maxLength={40} value={typed.label} onChange={(e) => save({ style: { ...typed, label: e.target.value }, box })} />
               </div>
               <fieldset>
@@ -133,10 +204,13 @@ export function EmbedDesigner({ appUrl, agentId }: { appUrl: string; agentId: st
                   <span className="text-xs text-faint">{style.color}</span>
                 </div>
               </fieldset>
+              <HexField value={style.color} onChange={(hex) => up("color", hex)} />
+              <LogoField agentId={agentId} value={style.logo} onChange={(url) => up("logo", url)} />
               <Choice legend="Where on the screen" value={style.position} options={POSITIONS} onChange={(v) => up("position", v)} />
               <Choice legend="Shape" value={style.shape} options={SHAPES} onChange={(v) => up("shape", v)} />
+              {style.shape === "orb" && <p className="-mt-2 text-sm text-muted">A small glowing sphere that gently pulses, so visitors can tell something is listening. Your words show beside it when someone points at it, and once when the page first loads.</p>}
               <Choice legend="Size" value={style.size} options={SIZES} onChange={(v) => up("size", v)} />
-              <Choice legend="Look" value={style.look} options={LOOKS} onChange={(v) => up("look", v)} />
+              {style.shape !== "orb" && <Choice legend="Look" value={style.look} options={LOOKS} onChange={(v) => up("look", v)} />}
               <Choice legend="Icon" value={style.icon} options={ICONS} onChange={(v) => up("icon", v)} />
               <Choice legend="Distance from the edge" value={style.edge} options={EDGES} onChange={(v) => up("edge", v)} />
             </>

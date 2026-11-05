@@ -151,8 +151,10 @@ export default function HelpPage() {
         <H id="website">Put it on a website</H>
         <P>
           Open the agent and choose <B>Put on website</B>. Switch it on and save. Then design what visitors will see: the words
-          on the button, its <B>color</B>, <B>shape</B>, <B>size</B>, <B>icon</B>, how it looks (solid, glass or outline), and where it
-          sits on the screen. The preview beside the controls is a mock website running the real button, so what you see is what
+          on the button, its <B>color</B> (pick a swatch or type your own hex code, like #0f766e), <B>shape</B>, <B>size</B>, <B>icon</B>,
+          how it looks (solid, glass or outline), and where it sits on the screen. You can also <B>upload your logo</B> and it shows
+          as a small round badge on the button. For something different, choose the <B>Glowing orb</B> shape: a small sphere that
+          softly pulses so visitors can tell something intelligent is listening. Your words appear beside it when someone points at it. The preview beside the controls is a mock website running the real button, so what you see is what
           visitors get. Switch the preview between a computer and a phone screen, and between a light and a dark page.
         </P>
         <Shot name="embed" height={1100} alt="The Put on website page with the button designer and a live preview"

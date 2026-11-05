@@ -2,7 +2,7 @@
 // the button with these; public/embed.js reads the same choices from data- attributes.
 
 export const POSITIONS = ["bottom-right", "bottom-left", "bottom-center", "top-right", "top-left", "top-center"] as const;
-export const SHAPES = ["pill", "rounded", "square", "circle"] as const;
+export const SHAPES = ["pill", "rounded", "square", "circle", "orb"] as const;
 export const SIZES = ["small", "medium", "large"] as const;
 export const LOOKS = ["solid", "glass", "outline"] as const;
 export const ICONS = ["none", "mic", "phone", "chat"] as const;
@@ -17,14 +17,27 @@ export interface ButtonStyle {
   icon: (typeof ICONS)[number];
   edge: (typeof EDGES)[number];
   color: string;
+  /** A small picture shown on the button (an https address), or "" for none. */
+  logo: string;
 }
 
 export const DEFAULT_STYLE: ButtonStyle = {
   label: "Talk to us", position: "bottom-right", shape: "pill", size: "medium",
-  look: "solid", icon: "none", edge: "normal", color: "#0f766e",
+  look: "solid", icon: "none", edge: "normal", color: "#0f766e", logo: "",
 };
 
 export const SWATCHES = ["#0f766e", "#2563eb", "#7c3aed", "#db2777", "#dc2626", "#ea580c", "#16a34a", "#111827", "#ffffff"];
+
+/** A colour typed by hand: "#0f766e", "0f766e" or "#0fe" all work. Returns "#rrggbb", or null. */
+export function parseHex(input: string): string | null {
+  const t = input.trim().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(t)) return `#${[...t].map((c) => c + c).join("")}`.toLowerCase();
+  if (/^[0-9a-f]{6}$/i.test(t)) return `#${t}`.toLowerCase();
+  return null;
+}
+
+/** Only a plain https address with no spaces or quotes can become the button's picture. */
+export const LOGO_PATTERN = /^https:\/\/[^\s"'<>\\]{1,290}$/;
 
 const oneOf = <T extends string>(allowed: readonly T[], v: unknown, fallback: T): T =>
   allowed.includes(v as T) ? (v as T) : fallback;
@@ -33,8 +46,9 @@ const oneOf = <T extends string>(allowed: readonly T[], v: unknown, fallback: T)
 export function normalizeStyle(p: Partial<Record<keyof ButtonStyle, unknown>> = {}): ButtonStyle {
   const label = String(p.label ?? DEFAULT_STYLE.label).replace(/[<>"&]/g, "").trim().slice(0, 40) || DEFAULT_STYLE.label;
   const color = typeof p.color === "string" && /^#[0-9a-f]{6}$/i.test(p.color) ? p.color.toLowerCase() : DEFAULT_STYLE.color;
+  const logo = typeof p.logo === "string" && LOGO_PATTERN.test(p.logo.trim()) ? p.logo.trim() : "";
   return {
-    label, color,
+    label, color, logo,
     position: oneOf(POSITIONS, p.position, DEFAULT_STYLE.position),
     shape: oneOf(SHAPES, p.shape, DEFAULT_STYLE.shape),
     size: oneOf(SIZES, p.size, DEFAULT_STYLE.size),
@@ -55,6 +69,7 @@ export function styleAttrs(style: Partial<ButtonStyle>): string {
   if (s.icon !== DEFAULT_STYLE.icon) out.push(`data-icon="${s.icon}"`);
   if (s.edge !== DEFAULT_STYLE.edge) out.push(`data-edge="${s.edge}"`);
   if (s.color !== DEFAULT_STYLE.color) out.push(`data-color="${s.color}"`);
+  if (s.logo) out.push(`data-logo="${s.logo}"`);
   return out.join(" ");
 }
 

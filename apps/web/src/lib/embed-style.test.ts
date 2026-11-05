@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { DEFAULT_STYLE, EDGES, ICONS, LOOKS, POSITIONS, SHAPES, SIZES, iframeSnippet, normalizeBox, normalizeStyle, previewDocument, readableText, scriptSnippet, styleAttrs } from "./embed-style.ts";
+import { DEFAULT_STYLE, parseHex, EDGES, ICONS, LOOKS, POSITIONS, SHAPES, SIZES, iframeSnippet, normalizeBox, normalizeStyle, previewDocument, readableText, scriptSnippet, styleAttrs } from "./embed-style.ts";
 
 const ID = "9bef4c7c-5c02-46fa-b325-f491a06c9d0c";
 
@@ -49,7 +49,27 @@ test("the preview runs the real script in preview mode, so no call can start", (
 test("embed.js understands every choice the designer can write", () => {
   const js = readFileSync(new URL("../../public/embed.js", import.meta.url), "utf8");
   for (const v of [...POSITIONS, ...SHAPES, ...SIZES, ...LOOKS, ...ICONS, ...EDGES]) assert.ok(js.includes(`"${v}"`), `embed.js does not know "${v}"`);
-  for (const attr of ["data-label", "data-position", "data-shape", "data-size", "data-style", "data-icon", "data-edge", "data-color", "data-preview"]) assert.ok(js.includes(attr), attr);
+  for (const attr of ["data-label", "data-position", "data-shape", "data-size", "data-style", "data-icon", "data-edge", "data-color", "data-logo", "data-preview"]) assert.ok(js.includes(attr), attr);
   // a colour is only ever used if it is a plain #rrggbb
   assert.ok(js.includes("^#[0-9a-f]{6}$"));
+  // a picture is only ever used if it is a plain https address
+  assert.ok(js.includes("^https:"));
+});
+
+test("a typed colour is accepted with or without the #, and short forms are widened", () => {
+  assert.equal(parseHex("#0F766E"), "#0f766e");
+  assert.equal(parseHex("  2563eb "), "#2563eb");
+  assert.equal(parseHex("#0fe"), "#00ffee");
+  assert.equal(parseHex("blue"), null);
+  assert.equal(parseHex("#12345"), null);
+  assert.equal(parseHex(""), null);
+});
+
+test("the orb and the logo make it into the code, and only safe pictures do", () => {
+  const url = "https://abc.supabase.co/storage/v1/object/public/embed-logos/x/y.png";
+  assert.equal(styleAttrs({ shape: "orb", logo: url }), `data-label="Talk to us" data-shape="orb" data-logo="${url}"`);
+  for (const bad of ["http://x.test/a.png", "javascript:alert(1)", 'https://x.test/a.png" onerror="x', "https://x.test/a b.png", "https://" + "x".repeat(400)]) {
+    assert.equal(normalizeStyle({ logo: bad }).logo, "", bad);
+  }
+  assert.equal(normalizeStyle({}).logo, "");
 });
