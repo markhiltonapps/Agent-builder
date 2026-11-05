@@ -129,3 +129,31 @@ async def begin(agent_id: str, kind: str = "voice", *, creds: tuple[str, str] | 
         log.warning("embed begin failed: %s", e)
         raise EmbedError("database is unreachable") from e
     return result if result in {"ok", "disabled", "unpublished", "limit"} else "disabled"
+
+
+async def rate_hit(
+    key: str, limit: int, window_s: int, *, creds: tuple[str, str] | None = None
+) -> bool:
+    """Count one hit for ``key`` and say whether it is within ``limit`` hits per ``window_s`` seconds.
+
+    The count lives in the database, so every copy of the web app shares it.
+    """
+    creds = creds or supabase.credentials()
+    if creds is None:
+        raise EmbedError("database is not configured")
+    url, skey = creds
+    try:
+        async with (
+            aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3)) as http,
+            http.post(
+                f"{url.rstrip('/')}/rest/v1/rpc/rate_hit",
+                json={"p_key": key, "p_limit": limit, "p_window_s": window_s},
+                headers=supabase.headers(skey),
+            ) as r,
+        ):
+            if r.status >= 300:
+                raise EmbedError(f"database said {r.status}")
+            result = await r.json()
+    except (aiohttp.ClientError, TimeoutError, ValueError) as e:
+        raise EmbedError("database is unreachable") from e
+    return result is True

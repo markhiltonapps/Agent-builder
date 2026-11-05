@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { embedBegin } from "@/lib/embed-info";
 import { isSameOrigin, isUuid, makeLimiter } from "@/lib/embed-code";
+import { sharedLimiter } from "@/lib/shared-limit";
 import { ownOrigins, visitorOf } from "@/lib/embed-origin";
 import { visitorToken } from "@/lib/livekit";
 
@@ -8,7 +9,7 @@ import { visitorToken } from "@/lib/livekit";
 // guarded three ways: it only answers our own embed page (Origin check), one visitor can only
 // start a few calls in a short time, and each agent has a daily cap in the database.
 
-const perVisitor = makeLimiter(5, 10 * 60_000);
+const perVisitor = sharedLimiter("call-start", 5, 10 * 60_000);
 const everyone = makeLimiter(120, 60_000);
 
 const say = (status: number, error: string) =>
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/embed/[agen
   if (!isSameOrigin(req.headers.get("origin"), ownOrigins(req))) return say(403, "forbidden");
 
   const visitor = visitorOf(req);
-  if (!everyone("all") || !perVisitor(visitor)) return say(429, "slow_down");
+  if (!everyone("all") || !(await perVisitor(visitor))) return say(429, "slow_down");
 
   switch (await embedBegin(agent, "voice")) {
     case "ok":

@@ -6,7 +6,8 @@ import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { compileConfig, draftConfig, reviseConfig } from "@/lib/builder-api";
 import { pushCard } from "@/lib/directory";
-import { MAX_SITES, makeLimiter, parseSites } from "@/lib/embed-code";
+import { MAX_SITES, parseSites } from "@/lib/embed-code";
+import { sharedLimiter } from "@/lib/shared-limit";
 import { checkSignupEmail, refusalMessage } from "@/lib/signup-guard";
 import { forgetEmbedInfo } from "@/lib/embed-info";
 import { logoKind, logoProblem } from "@/lib/embed-logo";
@@ -34,8 +35,8 @@ export async function signIn(_: FormState, form: FormData): Promise<FormState> {
 }
 
 // Every sign-up call sends a real email, so there are few of them: per visitor and in total, per hour.
-const signUpPerVisitor = makeLimiter(4, 60 * 60_000);
-const signUpAll = makeLimiter(30, 60 * 60_000);
+const signUpPerVisitor = sharedLimiter("signup-visitor", 4, 60 * 60_000);
+const signUpAll = sharedLimiter("signup-all", 30, 60 * 60_000);
 
 export async function signUp(_: FormState, form: FormData): Promise<FormState> {
   // Sign-up is closed unless ALLOW_SIGNUP=true. The database also restricts who can create a
@@ -50,7 +51,7 @@ export async function signUp(_: FormState, form: FormData): Promise<FormState> {
   // Check the address before Supabase sees it (format, a domain that can receive mail, not a test
   // domain) and limit how often it can happen. Never retried: a failure here is shown, not repeated.
   const visitor = ((await headers()).get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
-  if (!signUpAll("all") || !signUpPerVisitor(visitor)) {
+  if (!(await signUpAll("all")) || !(await signUpPerVisitor(visitor))) {
     return { error: "Too many sign-up attempts. Please wait an hour and try again.", email: text(form, "email") };
   }
   const checked = await checkSignupEmail(text(form, "email"));

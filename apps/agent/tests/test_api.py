@@ -147,3 +147,36 @@ async def test_chat_problems_come_back_with_a_reason_and_a_status():
             "/v1/chat/send", json={"session": "s", "message": "x" * 4001}, headers=AUTH
         )
         assert long.status == 400
+
+
+async def test_the_shared_limit_counts_in_the_database_and_says_when_it_is_unreachable(
+    client, monkeypatch
+):
+    from agent_builder import embed
+
+    seen = []
+
+    async def rate_hit(key, limit, window_s):
+        seen.append((key, limit, window_s))
+        return len(seen) <= 2
+
+    monkeypatch.setattr(embed, "rate_hit", rate_hit)
+    body = {"key": "chat:1.2.3.4", "limit": 2, "window_s": 60}
+    allowed = [
+        (await (await client.post("/v1/limit/hit", json=body, headers=AUTH)).json())["allowed"]
+        for _ in range(3)
+    ]
+    assert allowed == [True, True, False] and seen[0] == ("chat:1.2.3.4", 2, 60)
+
+    async def down(*_a):
+        raise embed.EmbedError("db down")
+
+    monkeypatch.setattr(embed, "rate_hit", down)
+    assert (await client.post("/v1/limit/hit", json=body, headers=AUTH)).status == 502
+    for bad in (
+        {},
+        {"key": "", "limit": 1, "window_s": 1},
+        {"key": "k", "limit": 0, "window_s": 1},
+    ):
+        assert (await client.post("/v1/limit/hit", json=bad, headers=AUTH)).status == 400
+    assert (await client.post("/v1/limit/hit", json=body)).status == 401

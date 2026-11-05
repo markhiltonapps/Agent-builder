@@ -181,3 +181,28 @@ async def account_contact(
     except (aiohttp.ClientError, TimeoutError, ValueError):
         return None
     return (rows[0].get("votel_contact_id") or None) if rows else None
+
+
+async def call_synced(
+    call_id: str, *, creds: tuple[str, str] | None = None, timeout_s: float = 8.0
+) -> bool:
+    """True if this call was already sent to Votel (a retry must not send it twice). Never raises."""
+    creds = creds or supabase.credentials()
+    if creds is None:
+        return False
+    url, key = creds
+    try:
+        async with (
+            aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout_s)) as http,
+            http.get(
+                f"{url.rstrip('/')}/rest/v1/calls",
+                params={"id": f"eq.{call_id}", "select": "votel_synced_at"},
+                headers=supabase.headers(key),
+            ) as r,
+        ):
+            if r.status >= 300:
+                return False
+            rows = await r.json()
+    except (aiohttp.ClientError, TimeoutError, ValueError):
+        return False
+    return bool(rows and rows[0].get("votel_synced_at"))

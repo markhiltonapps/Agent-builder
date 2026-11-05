@@ -11,7 +11,7 @@ export async function proxy(request: NextRequest) {
   // The website embed is public: the loader script, the start route, and the embed page itself.
   // The page may only be shown by the sites its owner listed (frame-ancestors), and only while
   // the owner has the embed switched on.
-  if (path === "/embed.js" || path.startsWith("/api/embed/")) return NextResponse.next();
+  if (path === "/embed.js" || path === "/api/health" || path.startsWith("/api/embed/")) return NextResponse.next();
   // A client's shared dashboard link carries its own secret; no sign-in.
   if (path.startsWith("/share/")) return NextResponse.next();
   if (path.startsWith("/embed/")) {

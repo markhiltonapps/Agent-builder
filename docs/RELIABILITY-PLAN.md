@@ -19,12 +19,12 @@ you; the rest are proposals, in the order I would do them.
 | **LiveKit Cloud** (rooms, SIP, phone numbers) | Everything voice stops, phone and web | None | One supplier for the whole voice path (Phase 2, partly accepted risk) |
 | **Phone carrier** (numbers bought through LiveKit) | Inbound calls fail | None | No second carrier; no "ring the front desk" fallback (Phase 2) |
 | **Voice worker** (Railway) | Calls dropped, new calls unanswered | A crashed model session restarts and resumes the call; restarts are automatic | As far as I can see, one copy runs. One crash or deploy = a gap (Phase 1) |
-| **Builder API** (Railway) | Chat stops, embeds cannot start, Votel sync stops | Calls themselves do not depend on it | One copy; **chat sessions live in its memory**, so a second copy or a restart loses open chats (Phase 1) |
-| **Web app** (Railway) | Nobody can use the dashboard or the embed | None beyond Railway restarts | One copy; abuse limits live in memory per copy (Phase 1) |
+| **Builder API** (Railway) | Chat stops, embeds cannot start, Votel sync stops | Calls themselves do not depend on it. **Done:** open chats are kept in the database, so a restart or a second copy loses nothing | One copy still (a second is item 6 in Phase 1, waiting on your OK) |
+| **Web app** (Railway) | Nobody can use the dashboard or the embed | None beyond Railway restarts. **Done:** per-visitor limits are counted in the database, so they hold across copies | One copy |
 | **Supabase** (database, sign-in) | Dashboard, billing, loading agents for new calls fail | Calls already in progress keep going | No tested restore, no replica (Phase 1 and 3) |
 | **Votel** (CRM) | Contacts and tasks not created | Best effort: a failed sync is recorded on the call and the call is never affected | Failed syncs are not retried later (Phase 1) |
 | **DNS and domain** (GoDaddy to Railway) | Site unreachable | None | Low risk, easy to improve (Phase 3) |
-| **Finished-call work** (summary, save, Votel) | A call could go unrecorded | The call record is saved to the database first | If the worker dies in the seconds after a call, that call's record can be lost (Phase 1) |
+| **Finished-call work** (summary, save, Votel) | A call could go unrecorded | **Done:** the work is queued in the database first, then done; anything that fails or is cut off is retried (30 seconds, 2 minutes, 10 minutes, then longer, eight tries) | A queue is only picked up while the builder API is running |
 
 ## 2. Targets
 
@@ -73,14 +73,14 @@ Known limits, stated plainly:
 
 ### Phase 1: remove single points and see problems first (next 2 weeks)
 
-1. **Two copies of everything on Railway.** Worker, builder API and web each run at least 2 replicas, so one crash or deploy never means an outage. Add Railway health checks so a broken release never takes traffic.
-2. **Move chat out of memory.** Open chats are stored in the database (the voice path already does this with `live_calls`), so any copy can serve any chat and a restart loses nothing.
-3. **A durable outbox for finished-call work.** The call record is written to the database first; summary, Votel sync and client notes become retried jobs. If Votel is down for an hour, everything catches up afterwards.
-4. **Shared limits.** Move per-visitor and per-agent limits from memory to the database, so they hold across copies.
+1. **Two copies of everything on Railway** (waiting on your OK for about $13 a month; items 2 to 4 below are done first because a second builder-api copy needs them). Worker, builder API and web each run at least 2 replicas, so one crash or deploy never means an outage. Add Railway health checks so a broken release never takes traffic.
+2. **Move chat out of memory. Done.** Open chats are stored in the database (the voice path already does this with `live_calls`), so any copy can serve any chat and a restart loses nothing.
+3. **A durable outbox for finished-call work. Done.** The call record is written to the database first; summary, Votel sync and client notes become retried jobs. If Votel is down for an hour, everything catches up afterwards.
+4. **Shared limits. Done** (per-visitor limits; the per-agent daily caps were already in the database). Move per-visitor and per-agent limits from memory to the database, so they hold across copies.
 5. **Alerts that reach your phone.** An uptime monitor on the site and the call box; a small scheduled **canary** that runs a real chat every 5 minutes and a real voice session every hour and alerts if either fails; error tracking (for example Sentry); a status line you can send clients.
 6. **Database safety.** Turn on point-in-time recovery in Supabase, and do one real restore into a scratch project to prove it works.
 7. **Spend guards.** OpenAI and Google monthly spend limits and an alert at 50, 80 and 100 percent.
-8. **A one-page runbook** for 2 a.m. and for demos (what to check, what to flip, who to call), plus a demo checklist: look at Voice status, place a test call, have a second device ready.
+8. **A one-page runbook. Done: `docs/RUNBOOK.md`.** for 2 a.m. and for demos (what to check, what to flip, who to call), plus a demo checklist: look at Voice status, place a test call, have a second device ready.
 
 ### Phase 2: depth (month 1 to 2)
 

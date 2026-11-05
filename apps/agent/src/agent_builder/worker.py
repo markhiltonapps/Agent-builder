@@ -34,8 +34,8 @@ from livekit.agents import (
 from livekit.agents.beta.tools import EndCallTool
 
 from .adapters import restore_adapters, snapshot_adapters
-from .call_finish import after_call
 from .compiler import CompiledAgent, compile_agent
+from .finish_queue import finish_call as queue_finish
 from .loader import ROOT, resolve_config
 from .preflight import run as run_preflight
 from .providers import build_voice_model
@@ -295,7 +295,7 @@ async def entrypoint(ctx: JobContext) -> None:
         path = CALL_LOG_DIR / f"{int(started)}-{room}.json"
         path.write_text(json.dumps(record, indent=2, default=str))
         log.info("call record written to %s", path)
-        await after_call(loaded, record)
+        await queue_finish(loaded, record)
 
     ctx.add_shutdown_callback(finish_call)
 

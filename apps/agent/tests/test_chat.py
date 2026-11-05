@@ -9,6 +9,7 @@ from aiohttp import web
 from agent_builder import chat as chat_module
 from agent_builder.calls_store import call_row, channel_for, source_for, transcript_lines
 from agent_builder.chat import ChatError, ChatService
+from agent_builder.chat_store import MemoryChatStore
 from agent_builder.config import AgentConfig
 from agent_builder.loader import LoadedConfig
 from agent_builder.template_library import all_industries, build
@@ -72,6 +73,7 @@ async def model():
 
 class Harness:
     def __init__(self, model: FakeModel, **kw):
+        self.url = model.url
         self.begun: list[tuple[str, str]] = []
         self.verdict = "ok"
         self.finished: list[tuple[LoadedConfig, dict]] = []
@@ -86,8 +88,21 @@ class Harness:
         async def finish(loaded: LoadedConfig, record: dict) -> None:
             self.finished.append((loaded, record))
 
-        self.service = ChatService(
-            begin=begin, load=load, finish=finish, key="k", base_url=model.url, **kw
+        self.load = load
+        self.begin = begin
+        self.finish = finish
+        self.service = self.another_copy(**kw)
+
+    def another_copy(self, **kw) -> ChatService:
+        """A second server sharing this harness's database (when ``store`` is given) and stand-ins."""
+        kw.setdefault("store", MemoryChatStore())
+        return ChatService(
+            begin=self.begin,
+            load=self.load,
+            finish=self.finish,
+            key="k",
+            base_url=self.url,
+            **kw,
         )
 
 
@@ -279,8 +294,11 @@ async def test_a_chat_that_goes_quiet_finishes_by_itself(model):
     h = Harness(model, idle_seconds=0.05)
     sid, _ = await h.service.start(AGENT)
     await h.service.send(sid, "hello")
-    await asyncio.sleep(0.3)
+    assert await h.service.sweep() == 0  # not quiet yet
+    await asyncio.sleep(0.1)
+    assert await h.service.sweep() == 1
     assert len(h.finished) == 1 and sid not in h.service.sessions
+    assert await h.service.sweep() == 0 and len(h.finished) == 1
     with pytest.raises(ChatError) as e:
         await h.service.send(sid, "still there?")
     assert e.value.code == "gone"
@@ -311,3 +329,136 @@ async def test_stopping_the_server_finishes_open_chats(harness):
     await harness.service.send(sid, "hi")
     await harness.service.close()
     assert len(harness.finished) == 1
+
+
+# --- a chat is kept in the database, so any copy of the server can carry it on -------------------
+
+
+def _shared() -> MemoryChatStore:
+    store = MemoryChatStore()
+    store.durable = True
+    return store
+
+
+async def test_another_copy_carries_on_a_chat_with_everything_that_happened(model):
+    store = _shared()
+    a = Harness(model, store=store)
+    model.script = [
+        tool_call("take_message", MESSAGE),
+        {"content": "Done, Sam!"},
+        {"content": "Anytime."},
+    ]
+    sid, greeting = await a.service.start(AGENT)
+    await a.service.send(sid, "Book me a cleaning")
+    b = a.another_copy(store=store)  # a different server, with an empty memory
+    assert sid not in b.sessions
+    assert await b.send(sid, "thanks") == "Anytime."
+    # it continued from the model's last answer, and knew the tool had already run
+    assert model.requests[-1]["previous_response_id"] == "resp_2"
+    assert await b.end(sid) is True
+    ((_, record),) = a.finished
+    assert [c["tool"] for c in record["tool_calls"]] == ["take_message"]
+    assert record["tool_calls"][0]["ok"] is True
+    assert [l["text"] for l in transcript_lines(record["transcript"])] == [
+        greeting,
+        "Book me a cleaning",
+        "Done, Sam!",
+        "thanks",
+        "Anytime.",
+    ]
+
+
+async def test_a_copy_that_missed_a_message_catches_up_instead_of_going_back(model):
+    store = _shared()
+    a = Harness(model, store=store)
+    b = a.another_copy(store=store)
+    model.script = [{"content": "one"}, {"content": "two"}, {"content": "three"}]
+    sid, _ = await a.service.start(AGENT)
+    await a.service.send(sid, "first")
+    await b.send(sid, "second")  # b answers while a still remembers only the first message
+    await a.service.send(sid, "third")
+    assert model.requests[-1]["previous_response_id"] == "resp_2"
+    await a.service.end(sid)
+    lines = [l["text"] for l in transcript_lines(a.finished[0][1]["transcript"])]
+    assert lines[1:] == ["first", "one", "second", "two", "third", "three"]
+
+
+async def test_a_chat_is_finished_once_whichever_copy_is_asked(model):
+    store = _shared()
+    a = Harness(model, store=store)
+    b = a.another_copy(store=store)
+    sid, _ = await a.service.start(AGENT)
+    await a.service.send(sid, "hi")
+    assert await b.end(sid) is True
+    assert await a.service.end(sid) is False
+    with pytest.raises(ChatError) as e:
+        await a.service.send(sid, "hello?")
+    assert e.value.code == "gone"
+    assert len(a.finished) == 1
+
+
+async def test_two_copies_sweeping_finish_a_quiet_chat_once(model):
+    store = _shared()
+    a = Harness(model, store=store, idle_seconds=0.05)
+    b = a.another_copy(store=store, idle_seconds=0.05)
+    sid, _ = await a.service.start(AGENT)
+    await a.service.send(sid, "hi")
+    await asyncio.sleep(0.1)
+    results = await asyncio.gather(a.service.sweep(), b.sweep())
+    assert sorted(results) == [0, 1]
+    assert len(a.finished) == 1
+
+
+async def test_stopping_one_copy_does_not_end_chats_another_can_continue(model):
+    store = _shared()
+    a = Harness(model, store=store)
+    sid, _ = await a.service.start(AGENT)
+    await a.service.send(sid, "hi")
+    await a.service.close()
+    assert a.finished == []
+    assert await a.another_copy(store=store).send(sid, "still here") == "Okay."
+
+
+async def test_a_chat_that_cannot_be_finished_yet_is_tried_again_then_given_up(model, monkeypatch):
+    store = _shared()
+    a = Harness(model, store=store, idle_seconds=0.0)
+    sid, _ = await a.service.start(AGENT)
+    await a.service.send(sid, "hi")
+    ok = a.load
+
+    async def down(agent_id: str):
+        raise TimeoutError
+
+    a.service._load = down
+    assert await a.service.sweep() == 1
+    assert a.finished == []
+    assert store.rows[sid]["ended"] is False  # waiting for the next sweep, not lost
+    a.service._load = ok
+    assert await a.service.sweep() == 1
+    assert len(a.finished) == 1
+    # a chat that never loads is given up on after a fixed number of tries
+    monkeypatch.setattr(chat_module, "FINISH_TRIES", 2)
+    sid2, _ = await a.service.start(AGENT)
+    await a.service.send(sid2, "hi")
+    a.service._load = down
+    await a.service.sweep()
+    await a.service.sweep()
+    assert store.rows[sid2]["ended"] is True and len(a.finished) == 1
+
+
+async def test_a_database_outage_does_not_stop_a_chat_this_copy_already_holds(model):
+    store = _shared()
+    a = Harness(model, store=store)
+    sid, _ = await a.service.start(AGENT)
+
+    async def broken(*_a, **_k):
+        raise OSError("db down")
+
+    store.load = broken  # type: ignore[method-assign]
+    store.save = broken  # type: ignore[method-assign]
+    assert await a.service.send(sid, "hi") == "Okay."
+    with pytest.raises(
+        ChatError
+    ) as e:  # a copy that holds nothing cannot help, and says to try again
+        await a.another_copy(store=store).send(sid, "hi")
+    assert e.value.code == "try_again"

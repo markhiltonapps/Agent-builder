@@ -13,6 +13,7 @@ Every /v1 call needs ``Authorization: Bearer $BUILDER_API_SECRET``.
 
 from __future__ import annotations
 
+import asyncio
 import hmac
 import json
 import logging
@@ -22,11 +23,12 @@ from typing import Any
 from aiohttp import web
 from pydantic import ValidationError
 
-from . import embed, voice_status, votel_clients, votel_import
+from . import embed, supabase, voice_status, votel_clients, votel_import
 from .chat import ChatError, ChatService
 from .compiler import compile_agent
 from .config import AgentConfig
 from .draft import DraftError, draft
+from .finish_queue import JobStore, default_store, drain_forever
 from .votel import VotelError, votel_config
 from .votel_directory import AgentCard, sync_agent
 
@@ -191,6 +193,26 @@ async def embed_begin(request: web.Request) -> web.Response:
         ) from None
     try:
         return web.json_response({"status": await embed.begin(agent_id, kind)})
+    except embed.EmbedError:
+        return web.json_response({"error": "unavailable"}, status=502)
+
+
+async def limit_hit(request: web.Request) -> web.Response:
+    """POST {"key", "limit", "window_s"} -> {"allowed": bool}. One shared count for every copy of the web app."""
+    try:
+        body = await request.json()
+        key = str(body["key"])[:200]
+        limit = int(body["limit"])
+        window_s = int(body["window_s"])
+        if not key or limit < 1 or window_s < 1:
+            raise ValueError
+    except (ValueError, KeyError, TypeError):
+        raise web.HTTPBadRequest(
+            text='{"error": "key, limit and window_s are required"}',
+            content_type="application/json",
+        ) from None
+    try:
+        return web.json_response({"allowed": await embed.rate_hit(key, limit, window_s)})
     except embed.EmbedError:
         return web.json_response({"error": "unavailable"}, status=502)
 
@@ -370,7 +392,12 @@ async def healthz(_request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
-def make_app(secret: str, chat: ChatService | None = None) -> web.Application:
+def make_app(
+    secret: str,
+    chat: ChatService | None = None,
+    jobs: JobStore | None = None,
+    background: bool | None = None,
+) -> web.Application:
     if len(secret) < 16:
         raise ValueError("BUILDER_API_SECRET must be at least 16 characters")
 
@@ -385,10 +412,24 @@ def make_app(secret: str, chat: ChatService | None = None) -> web.Application:
     app = web.Application(middlewares=[auth], client_max_size=MAX_BODY_BYTES)
     app[CHAT] = chat or ChatService()
 
-    async def finish_chats(app: web.Application) -> None:
-        await app[CHAT].close()  # a chat in progress is saved when the server stops
+    run_background = supabase.credentials() is not None if background is None else background
 
-    app.on_cleanup.append(finish_chats)
+    async def background_work(app: web.Application):
+        """Two jobs every copy of this server does: finish chats whose visitor went quiet, and
+        retry the work after calls that did not finish (a Votel outage, a worker that died)."""
+        tasks: list[asyncio.Task[None]] = []
+        if run_background:
+            tasks.append(asyncio.create_task(app[CHAT].run_sweeper(), name="chat-sweeper"))
+            store = jobs or default_store()
+            if store is not None:
+                tasks.append(asyncio.create_task(drain_forever(store), name="finish-drainer"))
+        yield
+        for t in tasks:
+            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        await app[CHAT].close()  # a chat held only in memory is saved when the server stops
+
+    app.cleanup_ctx.append(background_work)
     app.router.add_post("/v1/validate", validate)
     app.router.add_post("/v1/compile", compile_)
     app.router.add_post("/v1/directory/sync", directory_sync)
@@ -396,6 +437,7 @@ def make_app(secret: str, chat: ChatService | None = None) -> web.Application:
     app.router.add_post("/v1/revise", draft_revise)
     app.router.add_get("/v1/embed/info", embed_info)
     app.router.add_post("/v1/embed/begin", embed_begin)
+    app.router.add_post("/v1/limit/hit", limit_hit)
     app.router.add_get("/v1/votel/agents", votel_agents)
     app.router.add_get("/v1/votel/bookables", votel_bookables)
     app.router.add_post("/v1/votel/import", votel_import_agent)

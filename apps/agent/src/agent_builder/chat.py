@@ -8,10 +8,12 @@ It talks to OpenAI's Responses API (the one the current models take tool calls t
 sends only what is new and points at the previous response, so the long instructions are read from
 cache rather than paid for again.
 
-A chat lives in memory while it is going. When the visitor ends it, or goes quiet for a few
-minutes, it is finished the way a call is: summarized, saved under Calls (marked as a chat),
-sent to Votel, and noted on the client's contact. Nothing in a chat can place a call or reach
-anything the agent's tools cannot reach.
+A chat is kept in the database between messages (see ``chat_store``), so any copy of the server can
+carry on a chat another copy started, and a restart or a deploy loses nothing. When the visitor
+ends it, or goes quiet for a few minutes, it is finished the way a call is: summarized, saved
+under Calls (marked as a chat), sent to Votel, and noted on the client's contact. Exactly one copy
+finishes each chat. Nothing in a chat can place a call or reach anything the agent's tools cannot
+reach.
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ import os
 import time
 import uuid
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 
@@ -31,8 +33,10 @@ import aiohttp
 from livekit.agents.llm import ChatContext, ToolError
 
 from . import embed
-from .call_finish import after_call
+from .adapters import Adapter, restore_adapters, snapshot_adapters
+from .chat_store import ChatStore, default_store
 from .compiler import CompiledAgent, compile_agent
+from .finish_queue import finish_call
 from .loader import LoadedConfig, published_source
 from .tools import CallRecorder, build_tools
 
@@ -44,6 +48,9 @@ MAX_USER_TURNS = 40
 MAX_TOOL_ROUNDS = 4
 MAX_SESSIONS = 300
 IDLE_SECONDS = 180.0
+SWEEP_EVERY_S = 30.0
+FINISH_TRIES = 10
+"""How many times a quiet chat is tried for finishing before it is given up on."""
 SORRY = "Sorry, I had trouble with that. Could you say it another way?"
 
 CHAT_RULES = """# This is a text chat
@@ -97,6 +104,7 @@ class Session:
     instructions: str
     tools: dict[str, Any]
     specs: list[dict[str, Any]]
+    adapters: dict[str, Adapter]
     recorder: CallRecorder
     started_at: float
     last_at: float
@@ -104,9 +112,7 @@ class Session:
     last_id: str | None = None
     """The model's previous response; the next turn continues from it."""
     turns: int = 0
-    ended: bool = False
-    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
-    idle: asyncio.TimerHandle | None = None
+    finish_tries: int = 0
 
 
 def _text_of(output: list[dict[str, Any]]) -> str:
@@ -125,12 +131,16 @@ Load = Callable[[str], Awaitable[LoadedConfig]]
 
 
 class ChatService:
+    """Runs website chats. The database holds each chat's state; ``sessions`` is only a cache of the
+    chats this copy has handled lately, so it may be behind and is checked on every message."""
+
     def __init__(
         self,
         *,
-        finish: Finish = after_call,
+        finish: Finish = finish_call,
         load: Load | None = None,
         begin: Callable[[str, str], Awaitable[str]] = embed.begin,
+        store: ChatStore | None = None,
         key: str | None = None,
         base_url: str | None = None,
         model: str | None = None,
@@ -140,6 +150,7 @@ class ChatService:
         self._finish = finish
         self._load = load or (lambda agent_id: published_source().load(agent_id))
         self._begin = begin
+        self._store = store or default_store()
         self._key = key
         self._base = base_url
         self._model = model
@@ -147,7 +158,109 @@ class ChatService:
         self._clock = clock
         self._effort: str | None = os.getenv("CHAT_REASONING_EFFORT", "low") or None
         self.sessions: dict[str, Session] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
         self._tasks: set[asyncio.Task[None]] = set()
+
+    # --- building and saving a session -------------------------------------------------------
+
+    def _build(
+        self, loaded: LoadedConfig, session_id: str, saved: dict[str, Any] | None
+    ) -> Session:
+        """A session for ``loaded``, fresh or restored from what the database holds."""
+        cfg = loaded.config
+        compiled = compile_agent(cfg, now=datetime.now(UTC))
+        recorder = CallRecorder()
+        tools, adapters = build_tools(cfg, compiled, recorder, caller=lambda: None)
+        by_name, specs = tool_specs(tools)
+        now = self._clock()
+        s = Session(
+            id=session_id,
+            loaded=loaded,
+            compiled=compiled,
+            instructions=chat_instructions(compiled, cfg.policy.backend_flows),
+            tools=by_name,
+            specs=specs,
+            adapters=adapters,
+            recorder=recorder,
+            started_at=now,
+            last_at=now,
+            transcript=[("assistant", compiled.opening_line)],
+        )
+        if saved:
+            s.started_at = float(saved.get("started_at", now))
+            s.last_at = float(saved.get("last_at", now))
+            s.last_id = saved.get("last_id") or None
+            s.turns = int(saved.get("turns", 0))
+            s.finish_tries = int(saved.get("finish_tries", 0))
+            s.transcript = [(str(r), str(t)) for r, t in saved.get("transcript", [])]
+            rec = saved.get("recorder") or {}
+            recorder.restore(
+                rec.get("calls", []), bool(rec.get("transferred")), rec.get("transfer_reason")
+            )
+            restore_adapters(adapters, saved.get("adapter_state") or {})
+        return s
+
+    @staticmethod
+    def _state(s: Session) -> dict[str, Any]:
+        return {
+            "agent_id": s.loaded.agent_id,
+            "version_id": s.loaded.version_id,
+            "version": s.loaded.version,
+            "fingerprint": s.compiled.fingerprint,
+            "started_at": s.started_at,
+            "last_at": s.last_at,
+            "last_id": s.last_id,
+            "turns": s.turns,
+            "finish_tries": s.finish_tries,
+            "transcript": [[r, t] for r, t in s.transcript],
+            "recorder": {
+                "calls": s.recorder.to_json(),
+                "transferred": s.recorder.transferred,
+                "transfer_reason": s.recorder.transfer_reason,
+            },
+            "adapter_state": snapshot_adapters(s.adapters),
+        }
+
+    async def _save(self, s: Session) -> None:
+        """Write the chat's state. A failure is logged and tried again after the next message."""
+        try:
+            await self._store.save(s.id, str(s.loaded.agent_id), self._state(s), s.last_at)
+        except Exception:
+            log.exception("could not save the chat state")
+
+    def _lock(self, session_id: str) -> asyncio.Lock:
+        return self._locks.setdefault(session_id, asyncio.Lock())
+
+    async def _open(self, session_id: str) -> Session | None:
+        """The open chat with this id, brought up to date from the database. None if it is over."""
+        cached = self.sessions.get(session_id)
+        try:
+            saved = await self._store.load(session_id)
+        except Exception as e:
+            if cached is not None:
+                log.warning("chat state unreachable; carrying on from memory: %s", e)
+                return cached
+            log.exception("could not read the chat state")
+            raise ChatError("try_again") from e
+        if saved is None:
+            self.sessions.pop(session_id, None)
+            return None
+        if (
+            cached is not None
+            and cached.turns == int(saved.get("turns", 0))
+            and cached.last_id == (saved.get("last_id") or None)
+        ):
+            return cached  # nothing happened elsewhere since this copy last saw it
+        agent_id = str(saved.get("agent_id") or "")
+        try:
+            loaded = await self._load(agent_id)
+        except LookupError as e:
+            raise ChatError("unpublished") from e
+        except (aiohttp.ClientError, TimeoutError, RuntimeError) as e:
+            raise ChatError("try_again") from e
+        s = self._build(loaded, session_id, saved)
+        self.sessions[session_id] = s
+        return s
 
     # --- starting ---------------------------------------------------------------------------
 
@@ -168,57 +281,38 @@ class ChatService:
         except (aiohttp.ClientError, TimeoutError, RuntimeError) as e:
             raise ChatError("try_again") from e
 
-        cfg = loaded.config
-        compiled = compile_agent(cfg, now=datetime.now(UTC))
-        recorder = CallRecorder()
-        tools, _ = build_tools(cfg, compiled, recorder, caller=lambda: None)
-        by_name, specs = tool_specs(tools)
-        now = self._clock()
-        session = Session(
-            id=uuid.uuid4().hex,
-            loaded=loaded,
-            compiled=compiled,
-            instructions=chat_instructions(compiled, cfg.policy.backend_flows),
-            tools=by_name,
-            specs=specs,
-            recorder=recorder,
-            started_at=now,
-            last_at=now,
-            transcript=[("assistant", compiled.opening_line)],
-        )
+        session = self._build(loaded, uuid.uuid4().hex, None)
         self.sessions[session.id] = session
-        self._arm_idle(session)
-        return session.id, compiled.opening_line
+        await self._save(session)
+        return session.id, session.compiled.opening_line
 
     # --- one message ------------------------------------------------------------------------
 
     async def send(self, session_id: str, text: str) -> str:
-        s = self.sessions.get(session_id)
-        if s is None or s.ended:
-            raise ChatError("gone")
         text = " ".join(text.split())  # one line, no stray whitespace
-        if not text:
-            raise ChatError("empty")
-        if len(text) > MAX_USER_CHARS:
-            raise ChatError("too_long")
-        async with s.lock:
-            if s.ended:
+        async with self._lock(session_id):
+            s = await self._open(session_id)
+            if s is None:
+                self._locks.pop(session_id, None)
                 raise ChatError("gone")
+            if not text:
+                raise ChatError("empty")
+            if len(text) > MAX_USER_CHARS:
+                raise ChatError("too_long")
             if s.turns >= MAX_USER_TURNS:
                 raise ChatError("limit")
-            before = s.last_id
+            before = (s.last_id, s.turns, len(s.transcript), s.recorder.to_json())
             s.turns += 1
             s.transcript.append(("user", text))
             try:
                 reply = await self._reply(s, text)
             except ChatError:
-                s.last_id = before
-                s.transcript.pop()
-                s.turns -= 1
+                s.last_id, s.turns = before[0], before[1]
+                del s.transcript[before[2] :]
                 raise
             s.transcript.append(("assistant", reply))
             s.last_at = self._clock()
-            self._arm_idle(s)
+            await self._save(s)
         return reply
 
     async def _reply(self, s: Session, text: str) -> str:
@@ -312,53 +406,115 @@ class ChatService:
 
     # --- finishing --------------------------------------------------------------------------
 
-    def _arm_idle(self, s: Session) -> None:
-        if s.idle:
-            s.idle.cancel()
-        loop = asyncio.get_running_loop()
-        s.idle = loop.call_later(self._idle, self._idle_fired, s.id)
-
-    def _idle_fired(self, session_id: str) -> None:
-        task = asyncio.get_running_loop().create_task(self.end(session_id))
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
-
     async def end(self, session_id: str) -> bool:
-        """Finish a chat now (the visitor left, or went quiet). False if it was already over."""
-        s = self.sessions.pop(session_id, None)
-        if s is None or s.ended:
+        """Finish a chat now (the visitor left). False if it was already over."""
+        self.sessions.pop(session_id, None)
+        self._locks.pop(session_id, None)
+        try:
+            saved = await self._store.claim(session_id)
+        except Exception:
+            log.exception("could not finish the chat: the database is unreachable")
             return False
-        s.ended = True
-        if s.idle:
-            s.idle.cancel()
-        if s.turns == 0:
-            return True  # opened and never used: nothing to save
+        if saved is None:
+            return False
+        await self._finish_saved(session_id, saved)
+        return True
+
+    async def _finish_saved(self, session_id: str, saved: dict[str, Any]) -> None:
+        """Turn a finished chat's saved state into a call record and hand it to the retry queue."""
+        if int(saved.get("turns", 0)) == 0:
+            return  # opened and never used: nothing to save
+        agent_id = str(saved.get("agent_id") or "")
+        try:
+            loaded = await self._load(agent_id)
+        except (LookupError, aiohttp.ClientError, TimeoutError, RuntimeError) as e:
+            log.warning("could not load agent %s to finish chat %s: %s", agent_id, session_id, e)
+            await self._reopen(session_id, saved)
+            return
+        if saved.get("version_id") and saved["version_id"] != loaded.version_id:
+            # Republished since the chat began: it is recorded against the version it ran on.
+            loaded = replace(loaded, version_id=saved["version_id"], version=saved.get("version"))
         chat = ChatContext.empty()
-        for role, text in s.transcript:
+        for role, text in saved.get("transcript", []):
             chat.add_message(role=role, content=text)  # type: ignore[arg-type]
+        rec = saved.get("recorder") or {}
+        started = float(saved.get("started_at", self._clock()))
+        last = float(saved.get("last_at", started))
+        calls = rec.get("calls", [])
         record = {
-            "room": f"web-chat-{s.id}",
-            "started_at": s.started_at,
-            "duration_s": max(0.0, s.last_at - s.started_at),
-            "goal_reached": s.recorder.goal_reached,
-            "transferred": s.recorder.transferred,
-            "transfer_reason": s.recorder.transfer_reason,
+            "room": f"web-chat-{session_id}",
+            "started_at": started,
+            "duration_s": max(0.0, last - started),
+            "goal_reached": any(c.get("goal") and c.get("ok") for c in calls),
+            "transferred": bool(rec.get("transferred")),
+            "transfer_reason": rec.get("transfer_reason"),
             "recoveries": 0,
             "voice_model": {
                 "model": self._model or os.getenv("CHAT_MODEL") or DEFAULT_MODEL,
                 "channel": "chat",
             },
-            "config_fingerprint": s.compiled.fingerprint,
-            "tool_calls": s.recorder.to_json(),
+            "config_fingerprint": saved.get("fingerprint"),
+            "tool_calls": calls,
             "transcript": chat.to_dict(),
         }
         try:
-            await self._finish(s.loaded, record)
+            await self._finish(loaded, record)
         except Exception:
             log.exception("finishing the chat failed")
-        return True
+
+    async def _reopen(self, session_id: str, saved: dict[str, Any]) -> None:
+        """A chat that could not be finished yet goes back to waiting, for a limited number of tries."""
+        tries = int(saved.get("finish_tries", 0)) + 1
+        if tries >= FINISH_TRIES:
+            log.error("giving up on finishing chat %s", session_id)
+            return
+        try:
+            await self._store.save(
+                session_id,
+                str(saved.get("agent_id") or ""),
+                {**saved, "finish_tries": tries},
+                float(saved.get("last_at", 0)),
+            )
+            await self._store.reopen(session_id)
+        except Exception:
+            log.exception("could not put chat %s back to wait", session_id)
+
+    async def sweep(self) -> int:
+        """Finish chats whose visitor went quiet, whichever copy of the server they were on.
+        Every copy runs this; the database hands each quiet chat to exactly one. Returns how many."""
+        finished = 0
+        try:
+            claimed = await self._store.claim_idle(self._idle)
+        except Exception:
+            log.exception("looking for quiet chats failed")
+            claimed = []
+        for sid, saved in claimed:
+            self.sessions.pop(sid, None)
+            self._locks.pop(sid, None)
+            await self._finish_saved(sid, saved)
+            finished += 1
+        # Forget chats another copy finished, so this copy's memory does not grow.
+        cutoff = self._clock() - self._idle - 60
+        for sid, s in list(self.sessions.items()):
+            if s.last_at < cutoff:
+                self.sessions.pop(sid, None)
+                self._locks.pop(sid, None)
+        return finished
+
+    async def run_sweeper(self, every_s: float = SWEEP_EVERY_S) -> None:
+        while True:
+            try:
+                await self.sweep()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("sweeping quiet chats failed")
+            await asyncio.sleep(every_s)
 
     async def close(self) -> None:
-        """Finish every open chat (the server is stopping)."""
+        """The server is stopping. Chats kept in the database carry on elsewhere and are finished when
+        they go quiet; chats held only in memory are finished now, or they would be lost."""
+        if self._store.durable:
+            return
         for sid in list(self.sessions):
             await self.end(sid)
