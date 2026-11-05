@@ -10,16 +10,15 @@ import { visitorToken } from "@/lib/livekit";
 const perVisitor = makeLimiter(5, 10 * 60_000);
 const everyone = makeLimiter(120, 60_000);
 
-function appOrigin(req: NextRequest): string {
-  if (process.env.APP_URL) {
-    try {
-      return new URL(process.env.APP_URL).origin;
-    } catch {
-      /* fall through to the request's own address */
-    }
-  }
+/** The addresses this app counts as its own: the configured one, and the one this request used. */
+function ownOrigins(req: NextRequest): string[] {
   const proto = req.headers.get("x-forwarded-proto") ?? "https";
-  return `${proto}://${req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? ""}`;
+  const arrived = `${proto}://${req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? ""}`;
+  try {
+    return process.env.APP_URL ? [new URL(process.env.APP_URL).origin, arrived] : [arrived];
+  } catch {
+    return [arrived];
+  }
 }
 
 const say = (status: number, error: string) =>
@@ -28,7 +27,7 @@ const say = (status: number, error: string) =>
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/embed/[agent]/start">) {
   const { agent } = await ctx.params;
   if (!isUuid(agent)) return say(404, "unavailable");
-  if (!isSameOrigin(req.headers.get("origin"), appOrigin(req))) return say(403, "forbidden");
+  if (!isSameOrigin(req.headers.get("origin"), ownOrigins(req))) return say(403, "forbidden");
 
   const visitor = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
   if (!everyone("all") || !perVisitor(visitor)) return say(429, "slow_down");

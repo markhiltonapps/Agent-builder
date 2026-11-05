@@ -42,9 +42,13 @@ export function frameAncestors(origins: string[]): string {
   return `frame-ancestors ${ok.length ? ok.join(" ") : "'none'"}`;
 }
 
-/** Is this request from our own pages? The embed page calls our start route, so Origin must match. */
-export function isSameOrigin(originHeader: string | null, appOrigin: string): boolean {
-  return originHeader !== null && originHeader === appOrigin;
+/**
+ * Is this request from our own pages? The embed page calls our start route, so Origin must be one of
+ * our own addresses (the configured one, or the one this request arrived on, since the app can be
+ * reached at more than one address).
+ */
+export function isSameOrigin(originHeader: string | null, ours: string | string[]): boolean {
+  return originHeader !== null && (Array.isArray(ours) ? ours : [ours]).includes(originHeader);
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

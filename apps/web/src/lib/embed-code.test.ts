@@ -32,6 +32,9 @@ test("only our own pages may start a call", () => {
   assert.equal(isSameOrigin("https://app.test", "https://app.test"), true);
   assert.equal(isSameOrigin("https://evil.test", "https://app.test"), false);
   assert.equal(isSameOrigin(null, "https://app.test"), false);
+  // the app can answer on two addresses; either one is ours
+  assert.equal(isSameOrigin("https://old.test", ["https://new.test", "https://old.test"]), true);
+  assert.equal(isSameOrigin("https://evil.test", ["https://new.test", "https://old.test"]), false);
 });
 
 test("the copied code points at the app and the agent", () => {
