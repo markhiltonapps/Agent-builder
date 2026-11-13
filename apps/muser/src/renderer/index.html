@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="muser-token" content="__MUSER_TOKEN__" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Muser</title>
+    <link rel="icon" href="/icon.png" />
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <div id="app">
+      <nav id="rail" aria-label="Agents and navigation"></nav>
+      <main id="main">
+        <header id="topbar"></header>
+        <section id="feed" tabindex="-1" aria-label="Conversation">
+          <div id="thread"></div>
+        </section>
+        <footer id="composer-wrap">
+          <div id="notice" hidden></div>
+          <form id="composer" autocomplete="off"></form>
+        </footer>
+      </main>
+      <aside id="drawer" aria-label="Chats" hidden></aside>
+      <div id="scrim" hidden></div>
+    </div>
+    <div id="overlay-root"></div>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script src="/markdown.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

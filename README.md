@@ -5,6 +5,7 @@ roadmap.
 
 ```
 apps/agent/     Python LiveKit worker: config schema, compiler, adapters, GPT-Live runtime
+apps/muser/     Muser: desktop chat app for personal agents (Electron). See apps/muser/README.md
   templates/    agent templates (home_services.json is the first)
 docs/           plan and design notes
 ```

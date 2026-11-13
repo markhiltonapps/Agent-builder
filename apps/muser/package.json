@@ -1,0 +1,70 @@
+{
+  "name": "muser",
+  "productName": "Muser",
+  "version": "0.1.0",
+  "description": "Muser: a desktop chat app for personal AI agents with saved chats, editable instructions and streaming replies.",
+  "main": "src/main/main.js",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "Neato",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "electron .",
+    "serve": "node src/core/cli.js",
+    "test": "node --test test/*.test.js",
+    "test:e2e": "node test/e2e/run.js",
+    "icons": "python3 scripts/make-icons.py",
+    "dist:linux": "electron-builder --linux dir deb --x64 --publish never",
+    "dist:mac": "electron-builder --mac zip --x64 --arm64 --publish never",
+    "dist:win": "electron-builder --win zip --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.neato.muser",
+    "productName": "Muser",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "zip"
+      ],
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "category": "Utility",
+      "target": [
+        "dir",
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "maintainer": "Neato <support@neato.invalid>",
+      "synopsis": "Desktop chat app for personal AI agents",
+      "description": "Muser: saved chats, editable agent instructions, streaming replies with stop and retry."
+    },
+    "win": {
+      "target": [
+        "zip"
+      ],
+      "icon": "build/icon.png"
+    }
+  },
+  "homepage": "https://github.com/markhiltonapps/agent-builder/tree/main/apps/muser",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/markhiltonapps/agent-builder.git",
+    "directory": "apps/muser"
+  }
+}
