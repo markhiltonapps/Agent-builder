@@ -18,7 +18,8 @@
     "icons": "python3 scripts/make-icons.py",
     "dist:linux": "electron-builder --linux dir deb --x64 --publish never",
     "dist:mac": "electron-builder --mac zip --x64 --arm64 --publish never",
-    "dist:win": "electron-builder --win zip --x64 --publish never"
+    "dist:win": "electron-builder --win zip --x64 --publish never",
+    "test:e2e:tools": "node test/e2e/tools.js"
   },
   "devDependencies": {
     "electron": "^45.3.2",

@@ -5,6 +5,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const os = require('node:os');
+const { MUTATING_TOOLS } = require('./tools');
 
 const LIMITS = { name: 40, role: 120, instructions: 8000, emoji: 8, title: 120, message: 20000 };
 
@@ -13,7 +15,9 @@ const DEFAULT_SETTINGS = {
   openaiModel: 'gpt-4o-mini',
   anthropicModel: 'claude-sonnet-5-5',
   keys: { openai: '', anthropic: '' },
+  folders: [], // folders agents may read and (with approval) change
 };
+const MAX_FOLDERS = 8;
 
 const PALETTE = ['#cfe3ff', '#ffe2c7', '#d9f0d2', '#f3d4ee', '#fff0b8', '#d4ecf0'];
 
@@ -99,6 +103,19 @@ class Store {
           touched = true;
           this.recovered++;
         }
+        for (const c of m.toolCalls || []) {
+          // A request that was waiting for approval never ran. One that was running may or may not have finished.
+          if (c.status === 'pending' || c.status === 'awaiting') {
+            c.status = 'cancelled';
+            c.result = JSON.stringify({ error: 'This action was cancelled before it ran.' });
+            touched = true;
+          } else if (c.status === 'running') {
+            c.status = 'interrupted';
+            c.outcome = 'Interrupted. It may or may not have finished';
+            c.result = JSON.stringify({ error: 'The app was closed while this ran; check whether it completed.' });
+            touched = true;
+          }
+        }
       }
       this.chats.set(chat.id, chat);
       if (touched) this.saveChat(chat);
@@ -136,6 +153,7 @@ class Store {
     for (const field of ['openaiModel', 'anthropicModel']) {
       if (patch[field] !== undefined) next[field] = cleanText(patch[field], 80, 'Model', { required: true });
     }
+    if (patch.folders !== undefined) next.folders = this._validateFolders(patch.folders);
     if (patch.keys) {
       for (const k of ['openai', 'anthropic']) {
         if (patch.keys[k] !== undefined) next.keys[k] = cleanText(patch.keys[k], 400, 'API key');
@@ -143,6 +161,44 @@ class Store {
     }
     this.settings = next;
     writeAtomic(path.join(this.dir, 'settings.json'), JSON.stringify(next, null, 2));
+  }
+
+  _validateFolders(list) {
+    if (!Array.isArray(list)) throw new HttpError(400, 'Folders must be a list.');
+    if (list.length > MAX_FOLDERS) throw new HttpError(400, `You can share up to ${MAX_FOLDERS} folders.`);
+    const home = fs.realpathSync.native(os.homedir());
+    const data = fs.realpathSync.native(this.dir);
+    const out = [];
+    for (const raw of list) {
+      if (typeof raw !== 'string' || !raw.trim()) throw new HttpError(400, 'Folder path is required.');
+      let p = raw.trim();
+      if (p === '~' || p.startsWith('~/')) p = path.join(os.homedir(), p.slice(1));
+      if (!path.isAbsolute(p)) throw new HttpError(400, `"${raw}" is not an absolute path.`);
+      let real;
+      try {
+        real = fs.realpathSync.native(path.resolve(p));
+        if (!fs.statSync(real).isDirectory()) throw new Error('not a directory');
+      } catch {
+        throw new HttpError(400, `"${raw}" is not a folder that exists.`);
+      }
+      if (real === path.parse(real).root) throw new HttpError(400, 'Sharing a whole drive is not allowed. Pick a specific folder.');
+      if (real === home) throw new HttpError(400, 'Sharing your whole home folder is not allowed. Pick a folder inside it, like Downloads.');
+      if (real === data || real.startsWith(data + path.sep) || data.startsWith(real + path.sep)) throw new HttpError(400, 'That folder overlaps Muser\'s own data.');
+      if (!out.includes(real)) out.push(real);
+    }
+    return out;
+  }
+
+  suggestedFolders() {
+    const out = [];
+    for (const name of ['Downloads', 'Documents', 'Desktop']) {
+      const p = path.join(os.homedir(), name);
+      try {
+        const real = fs.realpathSync.native(p);
+        if (fs.statSync(real).isDirectory() && !this.settings.folders.includes(real)) out.push({ name, path: real });
+      } catch { /* not present */ }
+    }
+    return out;
   }
 
   // ---- agents ---------------------------------------------------------------------------
@@ -161,13 +217,17 @@ class Store {
     if ('emoji' in input) out.emoji = cleanText(input.emoji, LIMITS.emoji, 'Avatar') || '🙂';
     if ('instructions' in input) out.instructions = cleanText(input.instructions, LIMITS.instructions, 'Instructions');
     if ('color' in input) out.color = PALETTE.includes(input.color) ? input.color : PALETTE[0];
+    if ('alwaysAllow' in input) {
+      if (!Array.isArray(input.alwaysAllow) || input.alwaysAllow.some((n) => !MUTATING_TOOLS.includes(n))) throw new HttpError(400, 'Unknown action in the always-allowed list.');
+      out.alwaysAllow = [...new Set(input.alwaysAllow)];
+    }
     return out;
   }
 
   createAgent(input) {
     const now = Date.now();
     const agent = this._agentFields(
-      { name: input.name, role: input.role ?? '', emoji: input.emoji ?? '🙂', instructions: input.instructions ?? '', color: input.color },
+      { name: input.name, role: input.role ?? '', emoji: input.emoji ?? '🙂', instructions: input.instructions ?? '', color: input.color, alwaysAllow: [] },
       { id: uid('agent'), createdAt: now, updatedAt: now },
     );
     this.agents.push(agent);

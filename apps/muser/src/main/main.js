@@ -66,7 +66,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(async () => {
     // The app needs no device permissions (camera, mic, location, notifications...).
     session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
-    server = createApp({ dataDir: path.join(app.getPath('userData'), 'data') });
+    server = createApp({ dataDir: path.join(app.getPath('userData'), 'data'), trash: (p) => shell.trashItem(p) });
     ({ url: serverUrl } = await server.listen(0));
     buildMenu();
     createWindow();

@@ -40,6 +40,9 @@
     search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
     check: '<path d="M5 12l5 5 9-10"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    monitor: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
+    chevron: '<path d="M6 9l6 6 6-6"/>',
+    folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   };
   function icon(name, size = 22) {
     const span = document.createElement('span');
@@ -97,7 +100,7 @@
 
   async function refreshState() {
     const st = await api('GET', '/api/state');
-    Object.assign(S, { agents: st.agents, chats: st.chats, settings: st.settings, active: st.active, limits: st.limits });
+    Object.assign(S, { agents: st.agents, chats: st.chats, settings: st.settings, active: st.active, limits: st.limits, suggested: st.suggestedFolders || [] });
   }
 
   // ---------------------------------------------------------------- rendering: chrome
@@ -163,19 +166,82 @@
 
   function fillBubble(el, msg) {
     if (msg.role === 'user') { el.textContent = msg.content; return; }
-    if (!msg.content && msg.status === 'streaming') { el.replaceChildren(h('span', { class: 'typing', 'aria-label': 'Typing' }, h('i'), h('i'), h('i'))); return; }
-    el.innerHTML = md.render(msg.content);
-    el.classList.toggle('caret', msg.status === 'streaming');
+    if (!msg.content && msg.status === 'streaming' && !(msg.toolCalls && msg.toolCalls.length)) { el.hidden = false; el.replaceChildren(h('span', { class: 'typing', 'aria-label': 'Typing' }, h('i'), h('i'), h('i'))); return; }
+    el.hidden = !msg.content;
+    el.innerHTML = msg.content ? md.render(msg.content) : '';
+    el.classList.toggle('caret', msg.status === 'streaming' && !!msg.content && !(msg.toolCalls && msg.toolCalls.length));
   }
 
-  function messageEl(msg, { last }) {
+  const TOOL_LABELS = { make_folder: 'Create folders', move_files: 'Move files', trash_files: 'Move to Trash', write_file: 'Create or replace files' };
+  const openDetails = new Set(); // call ids whose "Task summary" is expanded
+
+  // The permission card: the exact plan, built by the server from the validated request.
+  function approvalCard(call) {
+    const open = openDetails.has(call.id);
+    const ask = (decision) => decide(call, decision);
+    return h('div', { class: 'approval', role: 'group', 'aria-label': call.title, 'data-call': call.id },
+      h('div', { class: 'ap-head' }, icon('monitor', 17), h('span', {}, call.title)),
+      h('button', { class: 'ap-summary', type: 'button', 'aria-expanded': String(open), onclick: () => { open ? openDetails.delete(call.id) : openDetails.add(call.id); replaceCard(call); } },
+        h('span', { class: 'txt' }, h('span', { class: 'k' }, 'Task summary'), h('span', { class: 'v' }, call.summary)),
+        h('span', { class: `chev${open ? ' up' : ''}` }, icon('chevron', 16))),
+      open && h('ul', { class: 'ap-items' }, ...(call.items || []).map((i) => h('li', {}, i))),
+      h('div', { class: 'ap-actions' },
+        h('button', { class: 'ap-btn primary', type: 'button', 'data-decision': 'allow', onclick: () => ask('allow') }, 'Allow'),
+        h('button', { class: 'ap-btn', type: 'button', 'data-decision': 'always', title: `Always allow “${TOOL_LABELS[call.name] || call.name}” for ${agent().name}`, onclick: () => ask('always') }, 'Always allow'),
+        h('button', { class: 'ap-btn', type: 'button', 'data-decision': 'deny', onclick: () => ask('deny') }, 'Deny')),
+    );
+  }
+
+  // Everything that is not waiting on you: a quiet one-line record of what happened.
+  function activityEl(call) {
+    const st = call.status;
+    const label = call.label || call.name;
+    let text;
+    if (st === 'running' || st === 'pending') text = `${label}…`;
+    else if (st === 'done') text = call.outcome || label;
+    else if (st === 'denied') text = `Denied: ${label}`;
+    else if (st === 'cancelled') text = `Cancelled: ${label}`;
+    else if (st === 'interrupted') text = call.outcome || `Interrupted: ${label}`;
+    else text = `Could not ${label.charAt(0).toLowerCase()}${label.slice(1)}: ${call.error || 'something went wrong'}`;
+    const bad = st === 'error' || st === 'interrupted';
+    const mark = st === 'done' ? icon('check', 14) : st === 'running' || st === 'pending' ? h('span', { class: 'spin', 'aria-hidden': 'true' }) : icon('x', 14);
+    const head = h('span', { class: 'a-line' }, mark, h('span', {}, text));
+    const hasItems = st === 'done' && !call.readOnly && call.items && call.items.length;
+    const el = hasItems
+      ? h('details', { class: 'activity', 'data-call': call.id, 'data-status': st }, h('summary', {}, head), h('ul', { class: 'ap-items' }, ...call.items.map((i) => h('li', {}, i))))
+      : h('div', { class: `activity${bad ? ' bad' : ''}`, 'data-call': call.id, 'data-status': st }, head);
+    return el;
+  }
+
+  const cardEl = (call) => (call.status === 'awaiting' ? approvalCard(call) : activityEl(call));
+  function replaceCard(call) {
+    const old = document.querySelector(`[data-call="${call.id}"]`);
+    if (old) old.replaceWith(cardEl(call));
+  }
+
+  async function decide(call, decision) {
+    const card = document.querySelector(`[data-call="${call.id}"]`);
+    card && card.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    try {
+      await api('POST', `/api/chats/${S.chat.id}/approve`, { callId: call.id, decision });
+    } catch (err) {
+      card && card.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+      toast(err.message);
+    }
+  }
+
+  function messageEl(msg, { last, live = false }) {
     const wrap = h('div', { class: `msg ${msg.role}${last ? ' last' : ''}`, 'data-id': msg.id });
     const bubble = h('div', { class: 'bubble' });
-    if (msg.role === 'assistant' && !msg.content && msg.status !== 'streaming') bubble.hidden = true;
     fillBubble(bubble, msg);
     wrap.append(bubble);
-    if (msg.role === 'assistant' && msg.status !== 'streaming') wrap.append(...assistantFooter(msg, last));
-    else if (msg.role === 'user') wrap.append(h('div', { class: 'actions' }, h('button', { class: 'act', type: 'button', title: 'Copy', 'aria-label': 'Copy message', onclick: () => copyText(msg.content) }, icon('copy', 15))));
+    if (msg.role === 'assistant') {
+      const calls = msg.toolCalls || [];
+      const cards = h('div', { class: 'cards' }, ...calls.map(cardEl));
+      cards.hidden = !calls.length;
+      wrap.append(cards);
+      if (!live && msg.status !== 'streaming') wrap.append(...assistantFooter(msg, last));
+    } else wrap.append(h('div', { class: 'actions' }, h('button', { class: 'act', type: 'button', title: 'Copy', 'aria-label': 'Copy message', onclick: () => copyText(msg.content) }, icon('copy', 15))));
     return wrap;
   }
 
@@ -187,7 +253,7 @@
     if (msg.status === 'stopped') bar.append(h('span', { class: 'note' }, 'Stopped'));
     if (msg.status === 'interrupted') bar.append(h('span', { class: 'note' }, 'Reply was interrupted'));
     if (last) bar.append(h('button', { class: `act${msg.status === 'done' ? '' : ' primary'}`, type: 'button', 'data-act': 'retry', 'aria-label': 'Retry', onclick: retry }, icon('retry', 15), 'Retry'));
-    parts.push(bar);
+    if (bar.children.length) parts.push(bar);
     return parts;
   }
 
@@ -205,7 +271,7 @@
     msgs.forEach((m, i) => {
       if (!prev || m.createdAt - prev > 15 * 60 * 1000) thread.append(h('div', { class: 'stamp' }, stamp(m.createdAt)));
       prev = m.createdAt;
-      thread.append(messageEl(m, { last: i === msgs.length - 1 }));
+      thread.append(messageEl(m, { last: i === msgs.length - 1, live: !!(S.stream && S.stream.cur && S.stream.cur.msg === m) }));
     });
     if (stick) scrollDown();
   }
@@ -269,24 +335,33 @@
     rafPending = true;
     requestAnimationFrame(() => {
       rafPending = false;
-      if (!S.stream) return;
+      const cur = S.stream && S.stream.cur;
+      if (!cur) return;
       const stick = nearBottom();
-      fillBubble(S.stream.bubble, S.stream.msg);
+      fillBubble(cur.bubble, cur.msg);
       if (stick) scrollDown();
     });
+  }
+
+  function announce(text) { const el = $('#live'); if (el) { el.textContent = ''; setTimeout(() => { el.textContent = text; }, 30); } }
+
+  // One live assistant message: a text bubble plus a slot for tool cards. A turn can have several.
+  function liveMessage(msg) {
+    const last = document.querySelector('#thread .msg.last');
+    last && last.classList.remove('last');
+    const wrap = messageEl(msg, { last: true, live: true });
+    $('#thread').append(wrap);
+    const cur = { msg, wrap, bubble: $('.bubble', wrap), cards: $('.cards', wrap) };
+    if (S.stream) S.stream.cur = cur;
+    return cur;
   }
 
   async function runStream(path, body) {
     const chat = S.chat;
     const ac = new AbortController();
-    const msg = { id: 'pending', role: 'assistant', content: '', status: 'streaming', createdAt: Date.now() };
-    const wrap = h('div', { class: 'msg assistant last' });
-    const bubble = h('div', { class: 'bubble' });
-    fillBubble(bubble, msg);
-    wrap.append(bubble);
-    $('#thread').append(wrap);
-    S.stream = { chatId: chat.id, ac, msg, bubble, wrap, stopping: false };
-    document.querySelectorAll('.msg.last').forEach((n) => n !== wrap && n.classList.remove('last'));
+    S.stream = { chatId: chat.id, ac, cur: null, stopping: false };
+    const placeholder = { id: 'pending', role: 'assistant', content: '', status: 'streaming', createdAt: Date.now(), toolCalls: [] };
+    liveMessage(placeholder);
     renderComposer();
     scrollDown();
     let finished = false;
@@ -294,15 +369,55 @@
     const finish = (final) => {
       if (finished) return;
       finished = true;
-      Object.assign(msg, final);
-      // Replace the live element with the final one (adds Retry / Copy / notes).
-      const idx = chat.messages.findIndex((m) => m.id === msg.id);
-      if (idx >= 0) chat.messages[idx] = { ...msg };
-      else chat.messages.push({ ...msg, id: `err_${Date.now()}` });
+      const cur = S.stream && S.stream.cur;
+      if (cur) {
+        Object.assign(cur.msg, final);
+        if (!chat.messages.includes(cur.msg)) chat.messages.push({ ...cur.msg, id: cur.msg.id === 'pending' ? `err_${Date.now()}` : cur.msg.id });
+      }
       S.stream = null;
       renderThread({ keepScroll: true });
       renderComposer();
+      // The server is the source of truth: re-sync once the turn is over.
+      api('GET', `/api/chats/${chat.id}`).then(({ chat: fresh }) => {
+        if (S.chat && S.chat.id === fresh.id && !S.stream) { S.chat = fresh; renderThread({ keepScroll: true }); }
+      }).catch(() => {});
       refreshState().then(() => { renderRail(); renderTopbar(); renderNotice(); renderDrawer(); }).catch(() => {});
+    };
+    const onEvent = (e) => {
+      const cur = S.stream && S.stream.cur;
+      if (e.t === 'start') {
+        started = true;
+        if (e.userMessage) {
+          const local = chat.messages.findIndex((m) => String(m.id).startsWith('local_'));
+          if (local >= 0) chat.messages[local] = e.userMessage;
+          else if (!chat.messages.some((m) => m.id === e.userMessage.id)) chat.messages.push(e.userMessage);
+        }
+        Object.assign(cur.msg, e.assistantMessage, { toolCalls: e.assistantMessage.toolCalls || [] });
+        chat.messages.push(cur.msg);
+        chat.title = e.title;
+      } else if (e.t === 'delta') {
+        cur.msg.content += e.text;
+        paintStream();
+      } else if (e.t === 'tools') {
+        cur.msg.toolCalls = e.calls;
+        cur.cards.replaceChildren(...e.calls.map(cardEl));
+        cur.cards.hidden = false;
+        fillBubble(cur.bubble, cur.msg);
+        scrollDown();
+      } else if (e.t === 'tool') {
+        const i = cur.msg.toolCalls.findIndex((c) => c.id === e.call.id);
+        if (i >= 0) cur.msg.toolCalls[i] = e.call; else cur.msg.toolCalls.push(e.call);
+        const old = cur.cards.querySelector(`[data-call="${e.call.id}"]`);
+        const el = cardEl(e.call);
+        if (old) old.replaceWith(el); else cur.cards.append(el);
+        if (e.call.status === 'awaiting') { announce(`${agent().name} is asking permission: ${e.call.title}`); }
+        scrollDown();
+      } else if (e.t === 'next') {
+        cur.msg.status = 'done';
+        liveMessage(e.message);
+        chat.messages.push(S.stream.cur.msg);
+        scrollDown();
+      } else if (e.t === 'done') finish(e.message);
     };
     try {
       const res = await fetch(path, { method: 'POST', signal: ac.signal, headers: { 'x-muser-token': TOKEN, 'content-type': 'application/json' }, body: JSON.stringify(body || {}) });
@@ -316,23 +431,9 @@
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
-        buf = parseSse(buf + decoder.decode(value, { stream: true }), (e) => {
-          if (e.t === 'start') {
-            // Replace optimistic user bubble ids with the saved ones.
-            started = true;
-            const local = chat.messages.findIndex((m) => String(m.id).startsWith('local_'));
-            if (local >= 0) chat.messages[local] = e.userMessage;
-            else if (!chat.messages.some((m) => m.id === e.userMessage.id)) chat.messages.push(e.userMessage);
-            msg.id = e.assistantMessage.id;
-            chat.messages.push({ ...msg });
-            chat.title = e.title;
-          } else if (e.t === 'delta') {
-            msg.content += e.text;
-            paintStream();
-          } else if (e.t === 'done') finish(e.message);
-        });
+        buf = parseSse(buf + decoder.decode(value, { stream: true }), onEvent);
       }
-      if (!finished) finish({ status: msg.content ? 'interrupted' : 'error', error: 'The connection closed before the reply finished.' });
+      if (!finished) finish({ status: S.stream && S.stream.cur && S.stream.cur.msg.content ? 'interrupted' : 'error', error: 'The connection closed before the reply finished.' });
     } catch (err) {
       if (!finished && !started && err.name !== 'AbortError') {
         // The server never accepted this request: undo the UI and let the caller recover.
@@ -342,7 +443,7 @@
       }
       if (!finished) {
         if (err.name === 'AbortError') finish({ status: 'stopped' });
-        else finish({ status: 'error', error: msg.content ? 'The connection was lost.' : err.message });
+        else finish({ status: 'error', error: 'The connection was lost.' });
       }
     }
     return { ok: true };
@@ -387,7 +488,8 @@
   async function retry() {
     if (S.stream || !S.chat) return;
     const msgs = S.chat.messages;
-    if (msgs.length && msgs[msgs.length - 1].role === 'assistant') msgs.pop();
+    const tail = msgs[msgs.length - 1];
+    if (tail && tail.role === 'assistant' && !(tail.toolCalls && tail.toolCalls.length)) msgs.pop();
     renderThread();
     const out = await runStream(`/api/chats/${S.chat.id}/retry`);
     if (!out.ok) {
@@ -534,7 +636,7 @@
   function openPlusMenu(anchor) {
     const old = $('.popover'); if (old) { old.remove(); return; }
     const r = anchor.getBoundingClientRect();
-    const items = [['New chat', 'compose', () => newChat()], ['Edit instructions', 'edit', () => openAgentSheet(agent())], ['Settings', 'settings', openSettings]];
+    const items = [['New chat', 'compose', () => newChat()], ['Edit instructions', 'edit', () => openAgentSheet(agent())], ['Share a folder…', 'folder', openSettings], ['Settings', 'settings', openSettings]];
     const pop = h('div', { class: 'popover', role: 'menu' }, items.map(([label, ic, fn]) => h('button', { type: 'button', role: 'menuitem', onclick: () => { pop.remove(); fn(); } }, icon(ic, 18), label)));
     document.body.append(pop);
     pop.style.left = `${Math.max(8, r.left)}px`;
@@ -559,9 +661,10 @@
   function openAgentSheet(existing) {
     const isNew = !existing;
     const lim = S.limits;
-    const draft = existing ? { ...existing } : { name: '', role: '', emoji: '🙂', color: COLORS[S.agents.length % COLORS.length], instructions: '' };
-    const base = JSON.stringify([draft.name, draft.role, draft.emoji, draft.color, draft.instructions]);
-    const dirty = () => JSON.stringify([draft.name, draft.role, draft.emoji, draft.color, draft.instructions]) !== base;
+    const draft = existing ? { ...existing, alwaysAllow: [...(existing.alwaysAllow || [])] } : { name: '', role: '', emoji: '🙂', color: COLORS[S.agents.length % COLORS.length], instructions: '', alwaysAllow: [] };
+    const snap = () => JSON.stringify([draft.name, draft.role, draft.emoji, draft.color, draft.instructions, draft.alwaysAllow]);
+    const base = snap();
+    const dirty = () => snap() !== base;
 
     overlay((o) => {
       const err = h('p', { class: 'err-line', role: 'alert' });
@@ -576,6 +679,18 @@
       instr.value = draft.instructions;
       const counter = h('em', {});
       const save = h('button', { class: 'btn primary', type: 'submit', id: 'save-agent' }, isNew ? 'Create agent' : 'Save');
+
+      // Actions this agent may do without asking. Revoking is one click.
+      const allowBox = h('div', { class: 'field', id: 'allow-box' });
+      const paintAllow = () => {
+        allowBox.hidden = !draft.alwaysAllow.length;
+        allowBox.replaceChildren(
+          h('span', {}, 'Always allowed', h('em', {}, 'no approval needed')),
+          h('div', { class: 'chips', style: { marginBottom: '0' } }, ...draft.alwaysAllow.map((n) =>
+            h('button', { class: 'chip', type: 'button', 'data-revoke': n, title: 'Ask me again', 'aria-label': `Stop always allowing: ${TOOL_LABELS[n] || n}`, onclick: () => { draft.alwaysAllow = draft.alwaysAllow.filter((x) => x !== n); paintAllow(); sync(); } }, `${TOOL_LABELS[n] || n}  ✕`))),
+        );
+      };
+      paintAllow();
 
       const sync = () => {
         draft.name = name.value; draft.role = role.value; draft.emoji = emoji.value.trim() || '🙂'; draft.instructions = instr.value;
@@ -604,7 +719,7 @@
         if (save.disabled) return;
         save.disabled = true; err.textContent = '';
         try {
-          const payload = { name: draft.name, role: draft.role, emoji: draft.emoji, color: draft.color, instructions: draft.instructions };
+          const payload = { name: draft.name, role: draft.role, emoji: draft.emoji, color: draft.color, instructions: draft.instructions, alwaysAllow: draft.alwaysAllow };
           if (isNew) {
             const { agent: created } = await api('POST', '/api/agents', payload);
             await refreshState();
@@ -628,6 +743,7 @@
         h('label', { class: 'field' }, h('span', {}, 'Name'), name),
         h('label', { class: 'field' }, h('span', {}, 'Role', h('em', {}, 'optional')), role),
         h('label', { class: 'field' }, h('span', {}, 'Instructions', counter), instr),
+        allowBox,
         err,
         h('div', { class: 'modal-actions' },
           !isNew && S.agents.length > 1 && h('button', { class: 'btn danger', type: 'button', id: 'delete-agent', onclick: async () => {
@@ -648,6 +764,24 @@
   function openSettings() {
     const st = S.settings;
     const draft = { provider: st.provider, openaiModel: st.openaiModel, anthropicModel: st.anthropicModel, keys: {} };
+    const folderErr = h('p', { class: 'err-line', role: 'alert' });
+    const folderList = h('div', { class: 'folder-list', id: 'folder-list' });
+    const setFolders = async (folders) => {
+      folderErr.textContent = '';
+      try {
+        const out = await api('PUT', '/api/settings', { folders });
+        S.settings = out.settings; S.active = out.active;
+        await refreshState();
+        paintFolders();
+      } catch (ex) { folderErr.textContent = ex.message; }
+    };
+    const paintFolders = () => {
+      folderList.replaceChildren(
+        ...(S.settings.folders.length ? S.settings.folders.map((f) => h('div', { class: 'folder-row' }, icon('folder', 16), h('span', { class: 'path', title: f }, f), h('button', { class: 'act', type: 'button', 'data-remove-folder': f, 'aria-label': `Stop sharing ${f}`, onclick: () => setFolders(S.settings.folders.filter((x) => x !== f)) }, icon('x', 14)))) : [h('p', { class: 'hint', style: { margin: '0 0 8px' } }, 'No folders shared yet. Agents cannot see your files.')]),
+        ...S.suggested.map((sg) => h('button', { class: 'chip', type: 'button', 'data-suggest': sg.name, onclick: () => setFolders([...S.settings.folders, sg.path]) }, `Share ${sg.name}`)),
+      );
+    };
+    paintFolders();
     overlay((o) => {
       const err = h('p', { class: 'err-line', role: 'alert' });
       const summary = h('p', { class: 'hint' });
@@ -675,7 +809,16 @@
       } },
         h('h2', {}, 'Settings'),
         h('p', { class: 'sub' }, 'Choose where replies come from. Keys stay on this computer and are never shown again.'),
-        seg, summary, model('openai', 'OpenAI'), keyField('openai', 'OpenAI'), model('anthropic', 'Anthropic'), keyField('anthropic', 'Anthropic'), err,
+        seg, summary, model('openai', 'OpenAI'), keyField('openai', 'OpenAI'), model('anthropic', 'Anthropic'), keyField('anthropic', 'Anthropic'),
+        h('div', { class: 'section' },
+          h('h3', {}, 'Shared folders'),
+          h('p', { class: 'hint' }, 'Agents can look inside these folders. Anything that changes files asks you first, and nothing outside them is ever touched.'),
+          folderList,
+          h('div', { class: 'folder-add' },
+            h('input', { class: 'input', id: 'folder-input', placeholder: 'Absolute path, e.g. /Users/you/Downloads', 'aria-label': 'Folder path' }),
+            h('button', { class: 'btn', type: 'button', id: 'folder-add', onclick: () => { const i = $('#folder-input'); const v = i.value.trim(); if (v) setFolders([...S.settings.folders, v]).then(() => { if (!folderErr.textContent) i.value = ''; }); } }, 'Add')),
+          folderErr),
+        err,
         h('div', { class: 'modal-actions' }, h('span', { class: 'spacer' }), h('button', { class: 'btn', type: 'button', onclick: () => o.close() }, 'Cancel'), h('button', { class: 'btn primary', type: 'submit', id: 'save-settings' }, 'Save')),
       );
     });

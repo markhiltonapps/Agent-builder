@@ -269,3 +269,44 @@ textarea.input { min-height: 150px; resize: vertical; line-height: 1.45; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- tool use: approval card and activity lines ---------- */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.cards { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 100%; margin-top: 6px; }
+.cards[hidden] { display: none; }
+.msg.assistant .bubble[hidden] { display: none; }
+.approval { background: var(--card); border-radius: 24px; box-shadow: var(--shadow); padding: 16px 16px 14px; width: 100%; max-width: none; align-self: stretch; }
+.msg.assistant { align-items: stretch; }
+.msg.assistant .bubble { align-self: flex-start; }
+.msg.assistant .actions { align-self: flex-start; }
+.msg.assistant .errbox { align-self: flex-start; }
+.ap-head { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 13.5px; margin: 0 2px 12px; }
+.ap-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; border: 0; border-radius: 12px; background: var(--field); padding: 9px 14px; color: var(--muted); }
+.ap-summary:hover { background: var(--hover); }
+.ap-summary .txt { display: flex; flex-direction: column; min-width: 0; }
+.ap-summary .k { font-size: 12px; }
+.ap-summary .v { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-summary .chev { display: inline-flex; transition: transform 0.15s; flex: none; }
+.ap-summary .chev.up { transform: rotate(180deg); }
+.ap-items { list-style: none; margin: 8px 0 0; padding: 8px 14px; max-height: 190px; overflow: auto; border-radius: 12px; background: var(--field); font: 12px/1.6 var(--mono); color: var(--muted); }
+.ap-items li { overflow-wrap: anywhere; }
+.ap-actions { display: flex; gap: 8px; margin-top: 12px; }
+.ap-btn { height: 30px; padding: 0 16px; border: 0; border-radius: 15px; background: var(--hover); font-size: 12.5px; font-weight: 600; }
+.ap-btn:hover:not(:disabled) { filter: brightness(0.96); }
+.ap-btn.primary { background: var(--accent); color: #fff; }
+.ap-btn:disabled { opacity: 0.5; cursor: default; }
+.activity { color: var(--muted); font-size: 13px; align-self: flex-start; max-width: 100%; }
+.activity.bad { color: var(--danger); }
+.activity .a-line { display: inline-flex; align-items: center; gap: 8px; }
+.activity summary { cursor: pointer; list-style: none; }
+.activity summary::-webkit-details-marker { display: none; }
+.activity .ap-items { margin-left: 22px; }
+.spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--muted); animation: spin 0.8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.section h3 { margin: 0 0 2px; font-size: 15px; }
+.folder-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.folder-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 6px 6px 12px; border-radius: 12px; background: var(--field); }
+.folder-row .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12.5px var(--mono); }
+.folder-add { display: flex; gap: 8px; }
+.folder-add .input { flex: 1; }

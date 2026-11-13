@@ -87,4 +87,48 @@ const openaiOk = (words) => ({ res }) => {
   res.end();
 };
 
-module.exports = { closeAll, boot, tmpDir, fakeUpstream, openaiOk };
+// A scripted OpenAI-style model. steps[i] answers the i-th request (the last one repeats):
+//   { text }                       stream a text reply
+//   { tools: [{ name, args }] }    ask for tool calls (arguments are streamed in two pieces)
+//   (body) => step                 decide from the request
+function scriptedOpenAI(steps) {
+  return ({ res, body, n }) => {
+    let step = steps[Math.min(n, steps.length) - 1];
+    if (typeof step === 'function') step = step(body, n);
+    res.writeHead(200, { 'content-type': 'text/event-stream' });
+    const chunk = (delta, finish) => res.write(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: finish || null }] })}\n\n`);
+    if (step.text !== undefined) for (const w of step.text.match(/\S+\s*/g) || []) chunk({ content: w });
+    (step.tools || []).forEach((t, i) => {
+      const raw = t.rawArgs !== undefined ? t.rawArgs : JSON.stringify(t.args || {});
+      const cut = Math.floor(raw.length / 2);
+      chunk({ tool_calls: [{ index: i, id: `call_${n}_${i}`, type: 'function', function: { name: t.name, arguments: raw.slice(0, cut) } }] });
+      chunk({ tool_calls: [{ index: i, function: { arguments: raw.slice(cut) } }] });
+    });
+    res.write('data: [DONE]\n\n');
+    res.end();
+  };
+}
+
+// Runs one send/retry as the UI would, answering approval cards through `decide(call)`.
+// decide returns 'allow' | 'always' | 'deny' | 'stop' (or undefined to leave it waiting).
+async function turn(t, chatId, { text, retry = false, decide } = {}) {
+  const s = await t.stream(`/api/chats/${chatId}/${retry ? 'retry' : 'send'}`, retry ? {} : { text });
+  if (s.error) return { status: s.status, error: s.error, events: [] };
+  const events = [];
+  const pending = [];
+  for await (const e of s.events) {
+    events.push(e);
+    if (e.t === 'tool' && e.call.status === 'awaiting' && decide) {
+      const call = JSON.parse(JSON.stringify(e.call));
+      pending.push((async () => {
+        const d = await decide(call);
+        if (d === 'stop') await t.call('POST', `/api/chats/${chatId}/stop`);
+        else if (d) await t.call('POST', `/api/chats/${chatId}/approve`, { callId: call.id, decision: d });
+      })());
+    }
+  }
+  await Promise.all(pending);
+  return { status: s.status, events, done: events.find((e) => e.t === 'done')?.message, tools: events.filter((e) => e.t === 'tool').map((e) => `${e.call.name}:${e.call.status}`) };
+}
+
+module.exports = { scriptedOpenAI, turn, closeAll, boot, tmpDir, fakeUpstream, openaiOk };
