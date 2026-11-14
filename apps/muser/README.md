@@ -30,6 +30,29 @@ in a clearly labelled **demo mode** that streams a local reply.
 Data lives in Electron's user-data folder (`…/data/`), or `~/.muser` when run with
 `npm run serve` (override with `MUSER_DATA_DIR`).
 
+## Use it from your phone
+
+Same Wi-Fi as your computer, then on the computer:
+
+```bash
+npm run serve:lan
+```
+
+It prints a link ending in `?key=...` and a QR code. Scan the QR code (or type the link) on your
+phone. The phone remembers you after the first visit. Chats, agents and approval cards all work
+by touch, and everything still runs on the computer: an approval you tap on the phone moves
+files on the computer.
+
+- The key is new every time you start it. Restarting means scanning again.
+- The link is a password. Anyone with it on your network can use Muser (and approve file
+  changes), so do not share it, and stop with Ctrl+C when done.
+- It is plain `http://` on your home network, not encrypted. Use it on networks you trust.
+- Windows or macOS may ask whether to allow incoming connections. Choose Allow (private network).
+- Guest Wi-Fi often blocks device-to-device traffic. Use your normal Wi-Fi.
+- `npm start` (the desktop window) and plain `npm run serve` stay computer-only. Only `serve:lan`
+  opens the network, and it needs the key for everything.
+- The Copy button does nothing on a phone (browsers only allow it over https).
+
 ## What it does
 
 - **Saved chats.** Every chat is a JSON file, written atomically. Your message is on disk
@@ -78,9 +101,10 @@ How it stays safe:
 ## Test
 
 ```bash
-npm test                  # 36 tests: API, restart recovery, tool engine, approval gate
+npm test                  # 43 tests: API, restart recovery, tool engine, approval gate, LAN lock
 npm run test:e2e          # 17 browser checks incl. kill -9 mid-reply and immediate restart
 npm run test:e2e:tools    # 11 browser checks: the approval card end to end (scripted model)
+npm run test:e2e:mobile   # 16 phone checks: touch taps over the network address, iPhone + Pixel sizes
 node test/e2e/run.js --live         # + 5 checks against the real OpenAI API (needs OPENAI_API_KEY)
 node test/e2e/tools.js --live       # + 3 checks: a real model working on real files
 xvfb-run -a node test/e2e/electron-smoke.js    # launches the real Electron app twice
@@ -116,6 +140,8 @@ opens links in your browser.
   against a fake upstream only; OpenAI tool use was also run live (gpt-4o-mini).
 - **Native Trash is verified on Linux only**; macOS and Windows use the same Electron call but
   were not run.
+- **Phone mode is tested with emulated phones** (Chromium with an iPhone/Pixel screen, touch and
+  user agent), not a physical device or real iOS Safari/WebKit.
 - **Voice** (mic button, dictation), **attachments** (the `+` opens New chat / Edit
   instructions / Settings instead), and the rail's other sections (tasks, ideas, apps).
 - **Signing and notarisation** for macOS and Windows; **auto-update**.

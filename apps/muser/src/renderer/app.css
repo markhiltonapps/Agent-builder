@@ -310,3 +310,41 @@ textarea.input { min-height: 150px; resize: vertical; line-height: 1.45; }
 .folder-row .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12.5px var(--mono); }
 .folder-add { display: flex; gap: 8px; }
 .folder-add .input { flex: 1; }
+
+/* ---------- phones and tablets ---------- */
+button { touch-action: manipulation; }
+@supports (height: 100dvh) { #app { height: 100dvh; } }
+#composer-wrap { padding-bottom: max(20px, env(safe-area-inset-bottom)); }
+#feed { padding-left: max(24px, env(safe-area-inset-left)); padding-right: max(24px, env(safe-area-inset-right)); overscroll-behavior: contain; }
+
+/* No hover on touch screens: show what hover would reveal, and make targets finger-sized. */
+@media (hover: none) {
+  .actions { opacity: 1; }
+  .chat-item .row-actions { display: flex; }
+  .chat-item .row-actions .act { width: 38px; height: 38px; }
+  .act { height: 36px; }
+  .rail-btn { width: 44px; height: 44px; }
+  .emoji-row button { width: 40px; height: 40px; }
+  .swatch { width: 30px; height: 30px; }
+  .btn, .chip { min-height: 40px; }
+}
+/* iOS zooms the page when a field under 16px gets focus. */
+@media (max-width: 640px), (hover: none) {
+  #composer textarea, .input, .search input, .chat-item .rename { font-size: 16px; }
+}
+@media (max-width: 640px) {
+  #drawer { left: 8px; right: 8px; top: 8px; bottom: 8px; width: auto; max-width: none; }
+  #agent-chip .name { max-width: 150px; }
+  .ap-btn { height: 38px; padding: 0 16px; font-size: 14px; }
+  .approval { padding: 14px 12px 12px; border-radius: 22px; }
+  .modal { padding: 18px; border-radius: 22px; }
+  .modal-back { padding: 8px; align-items: end; }
+  #toast { bottom: 110px; max-width: calc(100vw - 32px); text-align: center; }
+}
+
+.head-actions { display: inline-flex; align-items: center; gap: 2px; }
+#close-drawer { width: 34px; padding: 0; justify-content: center; }
+@media (hover: none) { #close-drawer { width: 40px; height: 40px; } }
+
+.ap-btn { white-space: nowrap; flex: none; }
+@media (max-width: 640px) { .ap-actions { gap: 6px; } .ap-btn { padding: 0 14px; } }

@@ -530,7 +530,7 @@
     const search = h('input', { type: 'search', placeholder: 'Search chats', 'aria-label': 'Search chats', value: S.search });
     search.addEventListener('input', () => { S.search = search.value; const pos = search.selectionStart; renderDrawer(); const s2 = $('#drawer input[type=search]'); s2.focus(); s2.setSelectionRange(pos, pos); });
     drawer.replaceChildren(
-      h('div', { class: 'drawer-head' }, h('h2', {}, 'Chats'), h('button', { class: 'act primary', type: 'button', 'aria-label': 'New chat', onclick: () => newChat() }, icon('compose', 16), 'New chat')),
+      h('div', { class: 'drawer-head' }, h('h2', {}, 'Chats'), h('span', { class: 'head-actions' }, h('button', { class: 'act primary', type: 'button', 'aria-label': 'New chat', onclick: () => newChat() }, icon('compose', 16), 'New chat'), h('button', { class: 'act', type: 'button', id: 'close-drawer', 'aria-label': 'Close chats', onclick: closeDrawer }, icon('x', 18)))),
       h('label', { class: 'search' }, icon('search', 16), search),
       body,
     );

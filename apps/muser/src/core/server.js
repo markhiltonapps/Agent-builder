@@ -84,7 +84,8 @@ function buildHistory(chat, current) {
     );
 }
 
-function createApp({ dataDir, token = crypto.randomBytes(24).toString('hex'), env = process.env, trash }) {
+function createApp({ dataDir, token = crypto.randomBytes(24).toString('hex'), env = process.env, trash, lanKey }) {
+  const lan = !!lanKey; // LAN mode: reachable from other devices, but only with the secret key
   const store = new Store(dataDir);
   const trasher = trash || appTrash(dataDir);
   const active = new Map(); // chatId -> AbortController
@@ -333,12 +334,56 @@ function createApp({ dataDir, token = crypto.randomBytes(24).toString('hex'), en
     return g.length === tokenBuf.length && crypto.timingSafeEqual(g, tokenBuf);
   };
 
+  const keyBuf = Buffer.from(lanKey || '');
+  const keyOk = (given) => {
+    if (!lan) return true;
+    const g = Buffer.from(String(given || ''));
+    return g.length === keyBuf.length && crypto.timingSafeEqual(g, keyBuf);
+  };
+  const cookie = (req, name) => {
+    const m = new RegExp(`(?:^|;\\s*)${name}=([^;]*)`).exec(req.headers.cookie || '');
+    return m ? m[1] : '';
+  };
+  // Any hostname could be an attacker's page pointing at this machine (DNS rebinding), so in LAN
+  // mode only IP addresses and .local names are accepted, on our port.
+  const hostOk = (host) => {
+    if (host === `127.0.0.1:${port}` || host === `localhost:${port}`) return true;
+    if (!lan) return false;
+    const m = /^(.+):(\d+)$/.exec(host);
+    if (!m || Number(m[2]) !== port) return false;
+    return /^\d{1,3}(\.\d{1,3}){3}$/.test(m[1]) || /^\[[0-9a-f:]+\]$/i.test(m[1]) || /^[a-z0-9-]+\.local$/i.test(m[1]);
+  };
+  const misses = new Map(); // ip -> { n, until }
+  const failed = (ip) => {
+    const m = misses.get(ip) || { n: 0, until: 0 };
+    m.n += 1;
+    if (m.n >= 10) { m.until = Date.now() + 60000; m.n = 0; }
+    misses.set(ip, m);
+  };
+  const throttled = (ip) => (misses.get(ip)?.until || 0) > Date.now();
+
   const server = http.createServer(async (req, res) => {
     try {
       const host = String(req.headers.host || '');
-      if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) throw new HttpError(403, 'Forbidden host.');
+      if (!hostOk(host)) throw new HttpError(403, 'Forbidden host.');
       const url = new URL(req.url, 'http://x');
       const pathname = url.pathname;
+      if (lan) {
+        const ip = req.socket.remoteAddress || '?';
+        if (throttled(ip)) throw new HttpError(429, 'Too many wrong keys. Wait a minute.');
+        const given = url.searchParams.get('key');
+        if (req.method === 'GET' && pathname === '/' && given !== null) {
+          if (!keyOk(given)) { failed(ip); throw new HttpError(401, 'Wrong key. Open the link Muser printed.'); }
+          // Right key: remember this device with a cookie and drop the key from the address bar.
+          res.writeHead(302, { location: '/', 'set-cookie': `muser_key=${lanKey}; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000`, 'cache-control': 'no-store' });
+          return res.end();
+        }
+        if (pathname !== '/icon.png' && !keyOk(cookie(req, 'muser_key'))) {
+          if (cookie(req, 'muser_key')) failed(ip);
+          res.writeHead(401, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+          return res.end('Muser is locked. Open the full link Muser printed in the terminal (it ends in ?key=...), or scan its QR code.');
+        }
+      }
       const secure = { 'content-security-policy': CSP, 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cross-origin-resource-policy': 'same-origin' };
 
       if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
@@ -380,7 +425,7 @@ function createApp({ dataDir, token = crypto.randomBytes(24).toString('hex'), en
     async listen(wantedPort = 0) {
       await new Promise((resolve, reject) => {
         server.once('error', reject);
-        server.listen(wantedPort, '127.0.0.1', resolve);
+        server.listen(wantedPort, lan ? '0.0.0.0' : '127.0.0.1', resolve);
       });
       port = server.address().port;
       return { port, token, url: `http://127.0.0.1:${port}/` };

@@ -19,7 +19,9 @@
     "dist:linux": "electron-builder --linux dir deb --x64 --publish never",
     "dist:mac": "electron-builder --mac zip --x64 --arm64 --publish never",
     "dist:win": "electron-builder --win zip --x64 --publish never",
-    "test:e2e:tools": "node test/e2e/tools.js"
+    "test:e2e:tools": "node test/e2e/tools.js",
+    "serve:lan": "node src/core/cli.js --lan",
+    "test:e2e:mobile": "node test/e2e/mobile.js"
   },
   "devDependencies": {
     "electron": "^45.3.2",
@@ -67,5 +69,8 @@
     "type": "git",
     "url": "https://github.com/markhiltonapps/agent-builder.git",
     "directory": "apps/muser"
+  },
+  "optionalDependencies": {
+    "qrcode-terminal": "^0.12.0"
   }
 }
